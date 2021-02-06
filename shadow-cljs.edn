@@ -1,0 +1,20 @@
+{:source-paths ["src"]
+
+ :dependencies [[org.clojure/core.async "0.4.500"]
+                [reagent "1.0.0"]
+                [com.taoensso/tufte "2.2.0"]]
+
+ :dev-http     {3449 "resources/public/"}
+
+ :builds       {:app {:output-dir    "resources/public/"
+                      :asset-path    "."
+                      :target        :browser
+                      :module-loader true
+                      :modules       {:main {:init-fn quad.main/init!}}
+                      :devtools      {:after-load quad.main/reload!
+                                      :repl-pprint true ;; needed for calva
+                                      }}
+                :test {:target    :node-test
+                       :output-to "out/node-tests.js"
+                       :ns-regexp "*"
+                       :autorun   false}}}
