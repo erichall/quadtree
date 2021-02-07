@@ -10,8 +10,6 @@
 (tufte/add-basic-println-handler! {})
 (declare render)
 
-
-
 (defonce state-atom (atom nil))
 (when (nil? @state-atom)
   (reset! state-atom {:cells              #{}

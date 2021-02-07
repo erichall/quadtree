@@ -79,6 +79,9 @@
                   :height   height
                   :width    width}}
     [show height width tree]
-    [rect {:movable-area-width width :movable-area-height height}]]
+    [rect {:movable-area-width  width
+           :movable-area-height height
+           :on-move             (fn [{:keys [x y width height]}])
+           :on-resize           (fn [{:keys [x y width height]}])}]]
    [action-bar {:state state :trigger-event trigger-event}]]
   )
