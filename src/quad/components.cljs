@@ -38,8 +38,33 @@
          (show-rects sw 4)))))
   ([tree] (show-rects tree 0)))
 
+(defn render-bounds
+  [bounds]
+  (map-indexed (fn [i {:keys [x y width height]}]
+                 [:g {:key (str x "," y "," width "," height "," i)}
+                  [:rect {:x      (- x width)
+                          :y      (- y height)
+                          :width  (* 2 width)
+                          :height (* 2 height)
+                          :style  {:opacity 0.8}
+                          :stroke "gray"
+                          :fill   "none"}]]) bounds))
+
+(defn render-cells
+  [{:keys [cells width height]}]
+  (map-indexed (fn [i {:keys [x y]}]
+                 [:g {:key (str x "-" y "-" width "-" height "-" i)}
+                  ;[:text {:x (- x 3)
+                  ;        :y (- y 3)
+                  ;        :style {:font "italic 5px sans-serif"}} (str x "," y)]
+                  [:circle {:cx    x
+                            :cy    y
+                            :r     3
+                            :fill  "white"
+                            :style {:opacity 0.4}}]]) cells))
+
 (defn show
-  [height width tree]
+  [{:keys [height width] :as state} bounds]
   [:div {:style {:position "absolute"}}
    [:div {:style {:position "relative"
                   :height   height
@@ -50,7 +75,8 @@
            :viewport (str "0 0 " height " " width)
            :style    {:border   "1px dashed green"
                       :position "absolute"}}
-     (show-rects tree)]
+     (render-bounds bounds)
+     (render-cells state)]
     [:div {:style {:height   height
                    :width    width
                    :position "absolute"}
@@ -73,15 +99,14 @@
 
 
 (defn app
-  [{:keys [tree height width] :as state} trigger-event]
+  [{:keys [tree height width] :as state} bounds trigger-event]
   [:div {:style {:display "flex" :flex-direction "column"}}
    [:div {:style {:position "relative"
                   :height   height
                   :width    width}}
-    [show height width tree]
+    [show state bounds]
     [rect {:movable-area-width  width
            :movable-area-height height
            :on-move             (fn [{:keys [x y width height]}])
            :on-resize           (fn [{:keys [x y width height]}])}]]
-   [action-bar {:state state :trigger-event trigger-event}]]
-  )
+   [action-bar {:state state :trigger-event trigger-event}]])

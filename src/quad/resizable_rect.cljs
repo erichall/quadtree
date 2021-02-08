@@ -195,7 +195,6 @@
                       (when (:on-resize-end callbacks)
                         ((:on-resize-end callbacks)
                          (merge {:event data} (select-keys @state-atom [:x :y :height :width]))))))))
-(cljs.pprint/pprint @state-atom)
 
 (defn resize-edge
   ([args] (resize-edge args nil))

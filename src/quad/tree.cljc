@@ -175,7 +175,8 @@
 
 (defn random-cells
   [n width height]
-  {:post [(= n (count %))]}
+  {:pre  [(number? n)]
+   :post [(= n (count %))]}
   (loop [rands #{}
          i 0]
     (if (= (count rands) n)
@@ -268,7 +269,6 @@
              (tree->cells ne acc-cells)
              (tree->cells se acc-cells)
              (tree->cells sw acc-cells))
-
      :else
      (concat
        cells
@@ -277,9 +277,33 @@
        (tree->cells se acc-cells)
        (tree->cells sw acc-cells)))))
 
+(defn tree->bounds
+  "Give you a list of all the bounds contained within a tree."
+  {:test (fn []
+           (let [tree (make-tree {:capacity 4
+                                  :bounds   {:x      200
+                                             :y      200
+                                             :width  200
+                                             :height 200}})]
+             (is (= (-> (insert tree {:x 0 :y 0})
+                        tree->bounds)
+                    [{:height 200 :width 200 :x 200 :y 200}]))))}
+  ([tree] (tree->bounds tree []))
+  ([{:keys [bounds nw ne se sw]} bounds-acc]
+   (if (nil? nw)
+     (conj bounds-acc bounds)
+     (concat
+       [bounds]
+       (tree->bounds nw bounds-acc)
+       (tree->bounds ne bounds-acc)
+       (tree->bounds se bounds-acc)
+       (tree->bounds sw bounds-acc)))))
+
 (comment
   (cljs.pprint/pprint @bounds-cache)
 
   (sort-by :x [{:x 1 :y 1} {:x 0 :y 0}])
+
+  (concat [1] [1 2 3] [4])
   )
 

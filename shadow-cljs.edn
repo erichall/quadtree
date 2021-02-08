@@ -6,14 +6,23 @@
 
  :dev-http     {3449 "resources/public/"}
 
- :builds       {:app {:output-dir    "resources/public/"
-                      :asset-path    "."
-                      :target        :browser
-                      :module-loader true
-                      :modules       {:main {:init-fn quad.main/init!}}
-                      :devtools      {:after-load quad.main/reload!
-                                      :repl-pprint true ;; needed for calva
-                                      }}
+ :builds       {:app  {:output-dir "resources/public/js"
+                       :asset-path "/js"
+                       :target     :browser
+                       ;:module-loader true
+                       :modules    {:shared {:entries []}
+                                    :main   {:init-fn    quad.main/init!
+                                             :depends-on #{:shared}}
+                                    :worker {:init-fn    quad.quad-worker/init
+                                             :depends-on #{:shared}
+                                             :web-worker true}}
+                       ;{:main
+                       ; {:init-fn quad.main/init!}
+                       ; } }
+
+                       :devtools   {:after-load     quad.main/reload!
+                                    :browser-inject :mod    ;; magically solves webworker for dev mode?!
+                                    }}
                 :test {:target    :node-test
                        :output-to "out/node-tests.js"
                        :ns-regexp "*"
