@@ -76,9 +76,28 @@
 (defn init!
   []
   (let [{:keys [width height]} @state-atom]
+
     (c/create-canvas 500 500)
-    (c/background 149)
-    (dispatch-worker {:name :batch-random-cells :data {:n      500
+    (c/resize-canvas)
+
+    ;(c/background "white")
+    ;
+    ;(c/fill-style "red")
+    ;(c/rect 30 30 200 200)
+    ;
+    ;
+    ;(c/stroke-style nil)
+    ;(c/line 20 20 200 20)
+    ;
+    ;(c/stroke-style "yellow")
+    ;(c/circle 5 35 60)
+
+    (doseq [i (range 0 999999)]
+      (c/draw-pixel i i 255 255 255 1))
+    (c/put-img-data)
+
+
+    (dispatch-worker {:name :batch-random-cells :data {:n      200
                                                        :height height
                                                        :width  width
                                                        :tree   initial-tree}} handle-event!))
