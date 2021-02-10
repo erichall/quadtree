@@ -41,16 +41,23 @@
                       render)
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
                      render)
-      :mouse-action (let [e data
-                          target (aget e "target")
-                          rect (.getBoundingClientRect target)
-                          x (- (.-clientX e) (.-left rect))
-                          y (- (.-clientY e) (.-top rect))]
-                      (let [{:keys [cells]} (swap! state-atom update :cells conj {:x x :y y})]
-                        (->>
-                          (qt/insert-cells (:tree @state-atom) cells)
-                          (swap! state-atom assoc :tree)
-                          render)))
+      :mouse-click (let [cell (c/mouse-xy data)]
+                     (-> (swap! state-atom (fn [{:keys [cells tree] :as state}]
+                                             (-> (assoc state :tree (qt/insert tree cell))
+                                                 (assoc :cells (conj cells cell)))))
+                         render))
+      :mouse-down (let [{:keys [x y] :as cell} (c/mouse-xy data)
+                        r 100
+                        random-cells (into #{} (conj (for [_ (range 10)
+                                                           :let [rr (* r (Math/sqrt (Math/random 1)))
+                                                                 theta (Math/sqrt (* 2 Math/PI))]]
+                                                       {:x (+ x (* rr (Math/cos theta)))
+                                                        :y (+ y (* rr (Math/sin theta)))})
+                                                     cell))]
+                    (-> (swap! state-atom (fn [{:keys [cells tree] :as state}]
+                                            (-> (assoc state :tree (qt/insert-cells tree random-cells))
+                                                (assoc :cells (concat cells random-cells)))))
+                        render))
       :new-tree (let [new-tree (:tree data)
                       cells (:cells data)]
                   (-> (swap! state-atom assoc
@@ -59,10 +66,16 @@
                       render)))))
 
 (defn render
-  [{:keys [tree] :as state}]
-  (rd/render
-    [app state (qt/tree->bounds tree) handle-event!]
-    (. js/document (getElementById "app"))))
+  [{:keys [cells tree] :as state}]
+  (doseq [{:keys [x y]} cells]
+    (c/fill-rect x y 3 3 "pink"))
+
+  (c/stroke-style "yellow")
+  (doseq [{:keys [x y width height]} (qt/tree->bounds tree)]
+    (c/rect (- x width) (- y height) (* 2 width) (* 2 height) {:batch? true}))
+  (c/stroke)
+
+  )
 
 (defn dispatch-worker
   [data trigger-event]
@@ -77,34 +90,19 @@
   []
   (let [{:keys [width height]} @state-atom]
 
-    (c/create-canvas 500 500)
+    (c/create-canvas width height)
     (c/resize-canvas)
 
-    ;(c/background "white")
-    ;
-    ;(c/fill-style "red")
-    ;(c/rect 30 30 200 200)
-    ;
-    ;
-    ;(c/stroke-style nil)
-    ;(c/line 20 20 200 20)
-    ;
-    ;(c/stroke-style "yellow")
-    ;(c/circle 5 35 60)
-
-    (doseq [i (range 0 999999)]
-      (c/draw-pixel i i 255 255 255 1))
-    (c/put-img-data)
-
-
-    (dispatch-worker {:name :batch-random-cells :data {:n      200
+    (dispatch-worker {:name :batch-random-cells :data {:n      1000
                                                        :height height
                                                        :width  width
                                                        :tree   initial-tree}} handle-event!))
 
+
+  (i/mouse-click (c/canvas) (fn [e] (handle-event! :mouse-click e)))
+  (i/mouse-down-move (c/canvas) (fn [e] (handle-event! :mouse-down e)))
+
   (render @state-atom)
-  (i/mouse-click (js/document.getElementById "svg-world-clicker") (fn [e] (handle-event! :mouse-action e)))
-  (i/mouse-down-move (js/document.getElementById "svg-world-clicker") (fn [e] (handle-event! :mouse-action e)))
   )
 
 (defn reload! [] (render @state-atom))

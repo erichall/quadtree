@@ -13,6 +13,19 @@
 (defn- width [] (aget @ctx-atom "canvas" "width"))
 (defn- height [] (aget @ctx-atom "canvas" "height"))
 
+(defn get-canvas-id [] (aget @ctx-atom "canvas" "id"))
+(defn canvas [] (aget @ctx-atom "canvas"))
+
+(defn mouse-xy
+  [js-event]
+  (let [
+        target (aget js-event "target")
+        rect (.getBoundingClientRect target)
+        x (- (.-clientX js-event) (.-left rect))
+        y (- (.-clientY js-event) (.-top rect))]
+    {:x x :y y}))
+
+
 (defn resize-canvas
   []
   (let [canvas (.-canvas @ctx-atom)
@@ -52,10 +65,10 @@
     (reset! ctx-atom (.getContext canvas "2d" (clj->js "alpha" false)))
     ;; TODO is this the only way to not blurr lines...?!?!?
     (.setTransform @ctx-atom 1, 0, 0, 1, 0.5, 0.5)
+
     ;; TODO might not be the best thing to create this here?
-    (reset! canvas-data-atom (.getImageData @ctx-atom 0 0 w h))))
-
-
+    ;(reset! canvas-data-atom (.getImageData @ctx-atom 0 0 w h))
+    ))
 
 (defn- begin-path
   [ctx]
@@ -67,10 +80,9 @@
   (.closePath ctx)
   ctx)
 
-(defn- stroke
-  [ctx]
-  (.stroke ctx)
-  ctx)
+(defn stroke
+  []
+  (.stroke @ctx-atom))
 
 ;; color
 (defn fill-style
@@ -88,6 +100,8 @@
 (defn- js-line-to [ctx & args] (ctx-invoke ctx "lineTo" args))
 (defn- js-translate [ctx & args] (ctx-invoke ctx "translate" args))
 (defn- js-arc [ctx & args] (ctx-invoke ctx "arc" args))
+(defn- js-fill-rect [ctx & args] (ctx-invoke ctx "fillRect" args))
+(defn- js-stroke [ctx & args] (ctx-invoke ctx "stroke" args))
 
 (defn translate
   [x y]
@@ -97,11 +111,21 @@
   [x y r g b a]
   (let [i (* (+ x (* y (width))) 4)
         canvas-data @canvas-data-atom]
+    (println (width) x y " is = " i)
     (aset canvas-data "data" (+ i 0) r)
     (aset canvas-data "data" (+ i 1) g)
     (aset canvas-data "data" (+ i 2) b)
     (aset canvas-data "data" (+ i 3) a)
     ))
+
+(defn white-img
+  []
+  (let [canvas-data @canvas-data-atom]
+    (doseq [i (range (.-length (.-data canvas-data)))]
+      (aset canvas-data "data" i 255)
+      )
+    )
+  )
 
 (defn put-img-data
   []
@@ -110,11 +134,18 @@
 
 ;; shapes
 (defn rect
-  [x y w h]
+  [x y w h & opt]
   (doto @ctx-atom
     begin-path
-    (js-rect x y w h)
-    js-fill))
+    (js-rect x y w h))
+  (when (get-in opt [0 :fill?])
+    (js-fill @ctx-atom))
+
+  ;; default stroke if not batching
+  (when-not (get-in opt [0 :batch?])
+    (js-stroke @ctx-atom))
+
+  )
 
 (defn line
   [x1 y1 x2 y2]
@@ -123,7 +154,7 @@
     ;(js-translate 0.5 0.5)
     (js-move-to x1 y1)
     (js-line-to x2 y2)
-    stroke))
+    js-stroke))
 
 (defn arc
   [x y r start-angle stop-angle]
@@ -137,13 +168,16 @@
   [x y r]
   (arc x y r 0 (* 2 Math/PI)))
 
-;(defn point)
+
+(defn fill-rect
+  [x y h w color]
+  (fill-style color)
+  (js-fill-rect @ctx-atom x y w h))
 
 
 (defn background
   [color]
-  (fill-style color)
-  (.fillRect @ctx-atom 0 0 (width) (height)))
+  (fill-rect 0 0 (width) (height) color))
 
 (comment
 
