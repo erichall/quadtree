@@ -1,6 +1,6 @@
 (ns quad.components
   (:require [reagent.core :as r]
-            [quad.resizable-rect :refer [rect]]))
+            [quad.resizable-rect :as rr]))
 
 (defn show-rects
   ([{:keys [bounds cells nw ne se sw name]} id]
@@ -97,6 +97,13 @@
    [:button {:on-click (fn [] (trigger-event :random-cells 100000)) :style {:margin-left "5px"}} "100000"]
    [:button {:on-click (fn [] (trigger-event :random-cells 1000000)) :style {:margin-left "5px"}} "1000000"]])
 
+(defn rect
+  [{:keys [width height on-move on-resize]}]
+  [rr/rect {:movable-area-width  width
+            :movable-area-height height
+            :on-move             on-move
+            :on-resize           on-resize}])
+
 
 (defn app
   [{:keys [tree height width] :as state} bounds trigger-event]
@@ -105,8 +112,8 @@
                   :height   height
                   :width    width}}
     [show state bounds]
-    [rect {:movable-area-width  width
-           :movable-area-height height
-           :on-move             (fn [{:keys [x y width height]}])
-           :on-resize           (fn [{:keys [x y width height]}])}]]
+    [rr/rect {:movable-area-width  width
+              :movable-area-height height
+              :on-move             (fn [{:keys [x y width height]}])
+              :on-resize           (fn [{:keys [x y width height]}])}]]
    [action-bar {:state state :trigger-event trigger-event}]])

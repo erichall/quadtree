@@ -1,26 +1,34 @@
 (ns quad.main
   (:require [quad.tree :as qt]
             [quad.input :as i]
-            [quad.components :refer [app]]
+            [quad.components :refer [app rect]]
             [quad.canvas :as c]
             [reagent.core :as r]
             [reagent.dom :as rd]
+
+    ;[shodan.console :as console :include-macros true]
+    ;[shodan.inspection :refer [inspect]]
+
             [taoensso.tufte :as tufte :refer (defnp p profiled profile)]
             ))
 
 
 (tufte/add-basic-println-handler! {})
-(declare render)
+(declare render render-rect)
 
 (enable-console-print!)
 
 (defonce state-atom (atom nil))
 (when (nil? @state-atom)
-  (reset! state-atom {:cells              []
-                      :width              1024
-                      :height             1024
-                      :resizable-rect-pos [0 0]
-                      :tree               nil}))
+  (reset! state-atom {:cells         []
+                      :width         1024
+                      :height        1024
+                      ;; TODO
+                      :target-bounds {:x      300
+                                      :y      200
+                                      :width  200
+                                      :height 200}
+                      :tree          nil}))
 
 (def initial-tree (qt/make-tree {:capacity 4
                                  :name     "start"
@@ -29,16 +37,28 @@
                                             :width  (/ (:width @state-atom) 2)
                                             :height (/ (:height @state-atom) 2)}}))
 
+(defn raf-render
+  [state]
+  (js/requestAnimationFrame (fn [timestamp] (render state))))
+
+(defn raf-render-rect
+  [state]
+  (js/requestAnimationFrame (fn [timestamp] (render-rect state))))
+
 (defn handle-event!
   [name data]
   (let [{:keys [width height]} @state-atom]
     (condp = name
       :print-tree (cljs.pprint/pprint (:tree @state-atom))
-      :random-cells (->>
-                      (qt/random-cells data width height)
-                      (qt/insert-cells initial-tree)
-                      (swap! state-atom assoc :tree)
-                      render)
+      :random-cells (let [cells (time (qt/random-cells data width height))]
+
+                      ;(console/time-start "random-cells")
+                      (->> (time (qt/insert-cells initial-tree cells))
+                           (swap! state-atom assoc :tree)
+                           (swap! state-atom assoc :cells cells)
+                           raf-render)
+                      ;(console/time-end "random-cells")
+                      )
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
                      render)
       :mouse-click (let [cell (c/mouse-xy data)]
@@ -63,19 +83,25 @@
                   (-> (swap! state-atom assoc
                              :tree new-tree
                              :cells (concat (:cells @state-atom) cells))
-                      render)))))
+                      render))
+      :cells-in-rect (let [in-rect (:cells-in-rect data)]
+                       (println in-rect)
+
+                       (-> (swap! state-atom assoc :cells-in-rect in-rect)
+                           render)))))
 
 (defn render
-  [{:keys [cells tree] :as state}]
+  [{:keys [cells tree cells-in-rect] :as state}]
   (doseq [{:keys [x y]} cells]
     (c/fill-rect x y 3 3 "pink"))
+
+  (doseq [{:keys [x y]} cells-in-rect]
+    (c/fill-rect x y 3 3 "red"))
 
   (c/stroke-style "yellow")
   (doseq [{:keys [x y width height]} (qt/tree->bounds tree)]
     (c/rect (- x width) (- y height) (* 2 width) (* 2 height) {:batch? true}))
-  (c/stroke)
-
-  )
+  (c/stroke))
 
 (defn dispatch-worker
   [data trigger-event]
@@ -86,6 +112,41 @@
                                                ))))
     (.. worker (postMessage (clj->js data)))))
 
+(defn on-rect-move
+  [{:keys [x y width height] :as bounds}]
+  (-> (swap! state-atom assoc :target-bounds {:x      (+ x (/ width 2))
+                                              :y      (+ y (/ height 2))
+                                              :width  (/ width 2)
+                                              :height (/ height 2)})
+      raf-render-rect
+      )
+  ;(dispatch-worker {:name :query-rect
+  ;                  :data {:tree    (:tree @state-atom)
+  ;                         :bounds  {:x      (+ x (/ width 2))
+  ;                                   :y      (+ y (/ height 2))
+  ;                                   :width  (/ width 2)
+  ;                                   :height (/ height 2)}
+  ;                         :cb-name :cells-in-rect}} handle-event!)
+  )
+
+(defn on-rect-resize
+  [bounds]
+  (swap! state-atom assoc :target-bounds (dissoc bounds :event)))
+
+(defn render-rect
+  [{:keys [tree cells target-bounds]}]
+
+  (let [cells-in-bounds (qt/query tree target-bounds)]
+    (doseq [{:keys [x y]} cells]
+      (c/fill-rect x y 3 3 "pink"))
+
+    (doseq [{:keys [x y]} cells-in-bounds]
+      (c/fill-rect x y 3 3 "red"))
+    )
+  )
+
+
+
 (defn init!
   []
   (let [{:keys [width height]} @state-atom]
@@ -93,16 +154,30 @@
     (c/create-canvas width height)
     (c/resize-canvas)
 
-    (dispatch-worker {:name :batch-random-cells :data {:n      1000
-                                                       :height height
-                                                       :width  width
-                                                       :tree   initial-tree}} handle-event!))
+    ;(dispatch-worker {:name :batch-random-cells :data {:n      1000
+    ;                                                   :height height
+    ;                                                   :width  width
+    ;                                                   :tree   initial-tree}} handle-event!)
+
+
+
+    (handle-event! :random-cells 500)
+
+    )
+
 
 
   (i/mouse-click (c/canvas) (fn [e] (handle-event! :mouse-click e)))
   (i/mouse-down-move (c/canvas) (fn [e] (handle-event! :mouse-down e)))
 
   (render @state-atom)
+
+  (rd/render
+    [rect {:width     1024
+           :height    1024
+           :on-move   on-rect-move
+           :on-resize on-rect-resize}]
+    (. js/document (getElementById "app")))
   )
 
 (defn reload! [] (render @state-atom))
@@ -132,7 +207,9 @@
     (println "------")
     )
 
-  (qt/insert-cells initial-tree (qt/make-cells 100))
+  (time (qt/random-cells 10000 1024 1024))
+
+  (qt/insert-cells initial-tree (qt/make-cells 10))
   (profile
     {}
     (doall

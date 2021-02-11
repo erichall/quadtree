@@ -2,9 +2,10 @@
 
  :dependencies [[org.clojure/core.async "0.4.500"]
                 [reagent "1.0.0"]
+                [shodan "0.4.2"]
                 [com.taoensso/tufte "2.2.0"]]
 
- :dev-http     {3449 "resources/public/"}
+ :dev-http     {3449 "resources/public"}
 
  :builds       {:app  {:output-dir "resources/public/js"
                        :asset-path "/js"

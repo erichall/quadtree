@@ -34,8 +34,13 @@
                          {:keys [name data]} (js->clj (aget js-event "data") :keywordize-keys true)
                          {:keys [n height width tree]} data]
                      (println "Worker got name :: " (keyword name))
-                     (println "Worker got data :: " n height width tree)
+                     ;(println "Worker got data :: " n height width tree)
                      (condp = (keyword name)
+                       :query-rect (let [in-rect (qt/query (:tree data) (:bounds data))]
+                                     ;(println "IN __ " in-rect)
+                                     (post-msg (clj->js {:name (:cb-name data)
+                                                         :data {:cells-in-rect in-rect}}))
+                                     )
                        :batch-random-cells (let [cell-batches (->> (qt/random-cells n width height)
                                                                    (partition 50))]
                                              (loop [tree tree

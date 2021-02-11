@@ -81,7 +81,7 @@
   ctx)
 
 (defn stroke
-  []
+  [& _]
   (.stroke @ctx-atom))
 
 ;; color

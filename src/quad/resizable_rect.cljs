@@ -1,6 +1,17 @@
 (ns quad.resizable-rect
   (:require [reagent.core :as r]))
 
+(defn debounce
+  [f interval]
+  (let [id (atom nil)]
+    (fn [& args]
+      (js/clearTimeout @id)
+      (let [new-id (js/setTimeout (fn []
+                                    (apply f args)) interval)]
+        (reset! id new-id))
+      )
+    )
+  )
 
 (defonce state-atom (r/atom nil))
 (def initial-state {:edge-width     10
@@ -139,7 +150,11 @@
                          :y (- (client-y data) initial-y))
                   (when (:on-move callbacks)
                     ((:on-move callbacks)
-                     (merge {:event data} (select-keys @state-atom [:x :y :height :width]))))))
+                     (merge {:event data} (select-keys @state-atom [:x :y :height :width])))
+                    )
+                  )
+
+                )
      :on-move-end (when (:down? @state-atom)
                     (swap! state-atom assoc :down? false :moving? false)
                     (when (:on-move-end callbacks)
@@ -296,7 +311,7 @@
                                :width    (str max-width "px")}
               :id             "overlay"
               :on-mouse-leave (fn [e] (trigger-event :on-mouse-leave e))
-              :on-mouse-move  (fn [e] (trigger-event :on-mouse-move e {:on-move on-move}))
+              :on-mouse-move  (fn [e] ((debounce trigger-event 50) :on-mouse-move e {:on-move on-move}))
               :on-mouse-up    (fn [e] (trigger-event :on-mouse-up e))
               :on-mouse-down  (fn [e] (trigger-event :on-mouse-down e))}
         [:div {:style {:display          "inline-block"
