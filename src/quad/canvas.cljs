@@ -132,6 +132,10 @@
   (js/console.log @canvas-data-atom)
   (.putImageData @ctx-atom @canvas-data-atom 0 0))
 
+(defn fill
+  []
+  (js-fill @ctx-atom))
+
 ;; shapes
 (defn rect
   [x y w h & opt]
@@ -144,7 +148,6 @@
   ;; default stroke if not batching
   (when-not (get-in opt [0 :batch?])
     (js-stroke @ctx-atom))
-
   )
 
 (defn line

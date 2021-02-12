@@ -311,7 +311,7 @@
                                :width    (str max-width "px")}
               :id             "overlay"
               :on-mouse-leave (fn [e] (trigger-event :on-mouse-leave e))
-              :on-mouse-move  (fn [e] ((debounce trigger-event 50) :on-mouse-move e {:on-move on-move}))
+              :on-mouse-move  (fn [e] ((debounce trigger-event 0) :on-mouse-move e {:on-move on-move}))
               :on-mouse-up    (fn [e] (trigger-event :on-mouse-up e))
               :on-mouse-down  (fn [e] (trigger-event :on-mouse-down e))}
         [:div {:style {:display          "inline-block"

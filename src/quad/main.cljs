@@ -6,7 +6,7 @@
             [reagent.core :as r]
             [reagent.dom :as rd]
 
-    ;[shodan.console :as console :include-macros true]
+            [shodan.console :as console :include-macros true]
     ;[shodan.inspection :refer [inspect]]
 
             [taoensso.tufte :as tufte :refer (defnp p profiled profile)]
@@ -50,17 +50,21 @@
   (let [{:keys [width height]} @state-atom]
     (condp = name
       :print-tree (cljs.pprint/pprint (:tree @state-atom))
-      :random-cells (let [cells (time (qt/random-cells data width height))]
+      :random-cells (let [cells (-> (qt/random-cells data width height)
+                                    ;qt/sort-cells-by-z-order
+                                    )]
 
-                      ;(console/time-start "random-cells")
-                      (->> (time (qt/insert-cells initial-tree cells))
+                      (console/time-start "insert-random-cells")
+                      (->> cells
+                           ;qt/sort-cells-by-z-order
+                           (qt/insert-cells initial-tree)
                            (swap! state-atom assoc :tree)
                            (swap! state-atom assoc :cells cells)
-                           raf-render)
-                      ;(console/time-end "random-cells")
-                      )
+                           )
+                      (console/time-end "insert-random-cells")
+                      (raf-render @state-atom))
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
-                     render)
+                     raf-render-rect)
       :mouse-click (let [cell (c/mouse-xy data)]
                      (-> (swap! state-atom (fn [{:keys [cells tree] :as state}]
                                              (-> (assoc state :tree (qt/insert tree cell))
@@ -85,8 +89,6 @@
                              :cells (concat (:cells @state-atom) cells))
                       render))
       :cells-in-rect (let [in-rect (:cells-in-rect data)]
-                       (println in-rect)
-
                        (-> (swap! state-atom assoc :cells-in-rect in-rect)
                            render)))))
 
@@ -135,16 +137,12 @@
 
 (defn render-rect
   [{:keys [tree cells target-bounds]}]
-
   (let [cells-in-bounds (qt/query tree target-bounds)]
     (doseq [{:keys [x y]} cells]
       (c/fill-rect x y 3 3 "pink"))
 
     (doseq [{:keys [x y]} cells-in-bounds]
-      (c/fill-rect x y 3 3 "red"))
-    )
-  )
-
+      (c/fill-rect x y 3 3 "red"))))
 
 
 (defn init!
