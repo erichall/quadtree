@@ -90,7 +90,6 @@
   [n]
   (bit-shift-left 1 n))
 
-
 (defn split-by-root-bounds
   [{:keys [x y width height]} depth]
   (let [td (two-pow depth)
@@ -250,8 +249,6 @@
                 (condj (flatten-tree se))
                 (condj (flatten-tree sw))))))
 
-
-;; Number.parseInt(Math.floor(Math.random() * 100))
 (defonce random-seed-atom (atom 1))
 (defn random-int
   ([max] (random-int 0 max))
@@ -293,13 +290,7 @@
                                              :height 200}})]
              (is (= (-> (insert tree {:x 0 :y 0})
                         (in-tree? {:x 0 :y 0}))
-                    true))
-             ;; test without seed is like lasagna without drinking red wine
-             ;(let [r (into [] (random-cells 100 200 200))]
-             ;  (is (= (-> (insert-cells tree r)
-             ;             (in-tree? (nth r 76)))
-             ;         true)))
-             ))}
+                    true))))}
   [{:keys [cells nw ne se sw]} cell]
   (cond
     (in? cells cell)
