@@ -1,5 +1,7 @@
 (ns quad.components
   (:require [reagent.core :as r]
+            [quad.util :refer [listen]]
+            [cljs.core.async :as async]
             [quad.resizable-rect :as rr]))
 
 (defn show-rects
@@ -97,13 +99,7 @@
    [:button {:on-click (fn [] (trigger-event :random-cells 100000)) :style {:margin-left "5px"}} "100000"]
    [:button {:on-click (fn [] (trigger-event :random-cells 1000000)) :style {:margin-left "5px"}} "1000000"]])
 
-(defn rect
-  [{:keys [width height on-move on-resize]}]
-  [rr/rect {:movable-area-width  width
-            :movable-area-height height
-            :on-move             on-move
-            :on-resize           on-resize}])
-
+(defn rect-maker [props] (rr/rect-maker props))
 
 (defn app
   [{:keys [tree height width] :as state} bounds trigger-event]
@@ -117,3 +113,32 @@
               :on-move             (fn [{:keys [x y width height]}])
               :on-resize           (fn [{:keys [x y width height]}])}]]
    [action-bar {:state state :trigger-event trigger-event}]])
+
+(defn add-mouse-window-handlers!
+  [handler]
+  (let [chans (async/merge [(listen js/window "mousedown")
+                            (listen js/window "mouseup")
+                            (listen js/window "mousemove")])]
+    (async/go-loop
+      []
+      (handler (async/<! chans))
+      (recur))))
+
+(defn mouse-handler
+  [e]
+  (let [target (aget e "target" "id")]
+    (println target)
+    )
+  )
+
+(defn controls
+  []
+  [:div {:style         {:position   "absolute"
+                         :width      "500px"
+                         :height     "100px"
+                         :background "green"}
+         :on-click      (fn [e] (println "Dude!"))
+         :on-mouse-up   (fn [e])
+         :on-mouse-move (fn [e])}
+   ]
+  )

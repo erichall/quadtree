@@ -295,34 +295,42 @@
 ;; TODO
 ;; Fix the little glitchy thingy when resizing from top, I think we need to clamp the cursor pos to the absolute edges.
 
-(defn rect
+(defn rect-maker
   [{:keys [movable-area-width movable-area-height on-move on-resize]}]
 
   (swap! state-atom assoc
          :max-height movable-area-height
          :max-width movable-area-width)
 
-  (fn []
-    (let [{:keys [x y width height max-height max-width]} @state-atom
-          trigger-event handle-event!]
-      [:div {:style {:position "relative"}}
-       [:div {:style          {:position "absolute"
-                               :height   (str max-height "px")
-                               :width    (str max-width "px")}
-              :id             "overlay"
-              :on-mouse-leave (fn [e] (trigger-event :on-mouse-leave e))
-              :on-mouse-move  (fn [e] ((debounce trigger-event 0) :on-mouse-move e {:on-move on-move}))
-              :on-mouse-up    (fn [e] (trigger-event :on-mouse-up e))
-              :on-mouse-down  (fn [e] (trigger-event :on-mouse-down e))}
-        [:div {:style {:display          "inline-block"
-                       :width            (str width "px")
-                       :height           (str height "px")
-                       :transform        (str "translate(" x "px, " y "px)")
-                       :user-select      "none"
-                       :background-color "rgb(119, 119, 119)"
-                       :opacity          0.3
-                       :cursor           "move"
-                       :position         "absolute"}
-               :id    "movable-rect"}]
-        [resizable-rect {:state @state-atom}]]])))
+  {:mouse-handler (fn [js-evt]
+                    (let [type (keyword (.-type js-evt))]
+                      (condp = type
+                        :on-mouse-move (handle-event! :on-mouse-move js-evt {:on-move on-move})
+                        :on-mouse-up (handle-event! :on-mouse-up js-evt)
+                        :on-mouse-down (handle-event! :on-mouse-down js-evt)
+
+                        ;; else
+                        nil)))
+   :component     (fn []
+                    (let [{:keys [x y width height max-height max-width]} @state-atom
+                          trigger-event handle-event!]
+                      [:div {:style {:position "relative"}}
+                       [:div {:style         {:position "absolute"
+                                              :height   (str max-height "px")
+                                              :width    (str max-width "px")}
+                              :id            "overlay"
+                              :on-mouse-move (fn [e] (trigger-event :on-mouse-move e {:on-move on-move}))
+                              :on-mouse-up   (fn [e] (trigger-event :on-mouse-up e))
+                              :on-mouse-down (fn [e] (trigger-event :on-mouse-down e))}
+                        [:div {:style {:display          "inline-block"
+                                       :width            (str width "px")
+                                       :height           (str height "px")
+                                       :transform        (str "translate(" x "px, " y "px)")
+                                       :user-select      "none"
+                                       :background-color "rgb(119, 119, 119)"
+                                       :opacity          0.3
+                                       :cursor           "move"
+                                       :position         "absolute"}
+                               :id    "movable-rect"}]
+                        [resizable-rect {:state @state-atom}]]]))})
 

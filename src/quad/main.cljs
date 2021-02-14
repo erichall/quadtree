@@ -1,7 +1,7 @@
 (ns quad.main
   (:require [quad.tree :as qt]
             [quad.input :as i]
-            [quad.components :refer [app rect]]
+            [quad.components :refer [app rect-maker controls add-mouse-window-handlers!]]
             [quad.canvas :as c]
             [reagent.core :as r]
             [reagent.dom :as rd]
@@ -144,10 +144,43 @@
     (doseq [{:keys [x y]} cells-in-bounds]
       (c/fill-rect x y 3 3 "red"))))
 
+(defn mouse-down?
+  [js-evt]
+  (= 1 (aget js-evt "buttons")))
+
+(defn mouse-handler-maker
+  [rect-mouse-handler]
+  (fn [js-evt]
+    (let [id (keyword (aget js-evt "target" "id"))
+          type (keyword (.-type js-evt))]
+      (condp = id
+        :overlay (when (and (= type :mousemove) (mouse-down? js-evt))
+                   (handle-event! :mouse-down js-evt))
+        :movable-rect (rect-mouse-handler js-evt)
+        :top (rect-mouse-handler js-evt)
+        :left (rect-mouse-handler js-evt)
+        :bottom (rect-mouse-handler js-evt)
+        :right (rect-mouse-handler js-evt)
+        :top-left (rect-mouse-handler js-evt)
+        :top-right (rect-mouse-handler js-evt)
+        :bottom-left (rect-mouse-handler js-evt)
+        :bottom-right (rect-mouse-handler js-evt)
+
+        ;; else
+        nil
+
+        )
+      )))
+
 
 (defn init!
   []
-  (let [{:keys [width height]} @state-atom]
+  (let [{:keys [width height]} @state-atom
+        rect-thing (rect-maker {:movable-area-width  width
+                                :movable-area-height height
+                                :on-move             on-rect-move
+                                :on-resize           on-rect-resize})
+        mouse-handler (mouse-handler-maker (:mouse-handler rect-thing))]
 
     (c/create-canvas width height)
     (c/resize-canvas)
@@ -158,24 +191,22 @@
     ;                                                   :tree   initial-tree}} handle-event!)
 
 
+    (handle-event! :random-cells 100)
 
-    (handle-event! :random-cells 500)
+    (add-mouse-window-handlers! mouse-handler)
+    ;; TOOOOODO
+    ;(i/mouse-click (c/canvas) (fn [e] (handle-event! :mouse-click e)))
+    ;(i/mouse-down-move (c/canvas) (fn [e] (handle-event! :mouse-down e)))
 
+    (render @state-atom)
+
+    (rd/render
+      [:div {:style {:position "relative"}}
+       [(:component rect-thing)]
+       [controls]
+       ]
+      (. js/document (getElementById "app")))
     )
-
-
-
-  (i/mouse-click (c/canvas) (fn [e] (handle-event! :mouse-click e)))
-  (i/mouse-down-move (c/canvas) (fn [e] (handle-event! :mouse-down e)))
-
-  (render @state-atom)
-
-  (rd/render
-    [rect {:width     1024
-           :height    1024
-           :on-move   on-rect-move
-           :on-resize on-rect-resize}]
-    (. js/document (getElementById "app")))
   )
 
 (defn reload! [] (render @state-atom))
