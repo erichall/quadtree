@@ -17,7 +17,7 @@ pom.xml
 .calva/
 .clj-kondo/
 quadtree.iml
-resources/
+resources/js
 node_modules/
 
 
