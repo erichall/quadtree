@@ -1,8 +1,9 @@
 (ns quad.main
   (:require [quad.tree :as qt]
             [quad.input :as i]
-            [quad.components :refer [app rect-maker controls add-mouse-window-handlers!]]
+            [quad.components :as comp]
             [quad.canvas :as c]
+            [quad.util :as u]
             [reagent.core :as r]
             [reagent.dom :as rd]
 
@@ -20,15 +21,16 @@
 
 (defonce state-atom (atom nil))
 (when (nil? @state-atom)
-  (reset! state-atom {:cells         []
-                      :width         1024
-                      :height        1024
+  (reset! state-atom {:cells             []
+                      :width             1024
+                      :height            1024
+                      :is-drawing-points false
                       ;; TODO
-                      :target-bounds {:x      300
-                                      :y      200
-                                      :width  200
-                                      :height 200}
-                      :tree          nil}))
+                      :target-bounds     {:x      300
+                                          :y      200
+                                          :width  200
+                                          :height 200}
+                      :tree              nil}))
 
 (def initial-tree (qt/make-tree {:capacity 4
                                  :name     "start"
@@ -71,16 +73,14 @@
                                                  (assoc :cells (conj cells cell)))))
                          render))
       :mouse-down (let [{:keys [x y] :as cell} (c/mouse-xy data)
-                        r 100
-                        random-cells (into #{} (conj (for [_ (range 10)
-                                                           :let [rr (* r (Math/sqrt (Math/random 1)))
-                                                                 theta (Math/sqrt (* 2 Math/PI))]]
-                                                       {:x (+ x (* rr (Math/cos theta)))
-                                                        :y (+ y (* rr (Math/sin theta)))})
+                        random-cells (into #{} (conj (for [_ (range 5)]
+                                                       {:x (u/random (- x 20) (+ x 20))
+                                                        :y (u/random (- y 20) (+ y 20))})
                                                      cell))]
                     (-> (swap! state-atom (fn [{:keys [cells tree] :as state}]
                                             (-> (assoc state :tree (qt/insert-cells tree random-cells))
-                                                (assoc :cells (concat cells random-cells)))))
+                                                (assoc :cells (concat cells random-cells))
+                                                (assoc :is-drawing-points true))))
                         render))
       :new-tree (let [new-tree (:tree data)
                       cells (:cells data)]
@@ -154,7 +154,11 @@
     (let [id (keyword (aget js-evt "target" "id"))
           type (keyword (.-type js-evt))]
       (condp = id
-        :overlay (when (and (= type :mousemove) (mouse-down? js-evt))
+        :overlay (when (and
+                         (not (comp/is-resizing-rect?))
+                         (not (comp/is-moving-rect?))
+                         (= type :mousemove)
+                         (mouse-down? js-evt))
                    (handle-event! :mouse-down js-evt))
         :movable-rect (rect-mouse-handler js-evt)
         :top (rect-mouse-handler js-evt)
@@ -176,10 +180,10 @@
 (defn init!
   []
   (let [{:keys [width height]} @state-atom
-        rect-thing (rect-maker {:movable-area-width  width
-                                :movable-area-height height
-                                :on-move             on-rect-move
-                                :on-resize           on-rect-resize})
+        rect-thing (comp/rect-maker {:movable-area-width  width
+                                     :movable-area-height height
+                                     :on-move             on-rect-move
+                                     :on-resize           on-rect-resize})
         mouse-handler (mouse-handler-maker (:mouse-handler rect-thing))]
 
     (c/create-canvas width height)
@@ -193,7 +197,7 @@
 
     (handle-event! :random-cells 100)
 
-    (add-mouse-window-handlers! mouse-handler)
+    (comp/add-mouse-window-handlers! mouse-handler)
     ;; TOOOOODO
     ;(i/mouse-click (c/canvas) (fn [e] (handle-event! :mouse-click e)))
     ;(i/mouse-down-move (c/canvas) (fn [e] (handle-event! :mouse-down e)))
@@ -203,7 +207,7 @@
     (rd/render
       [:div {:style {:position "relative"}}
        [(:component rect-thing)]
-       [controls]
+       [comp/controls]
        ]
       (. js/document (getElementById "app")))
     )

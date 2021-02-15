@@ -19,3 +19,7 @@
      out))
   ([element type]
    (listen element type false)))
+
+(defn random
+  [min max]
+  (+ (* (Math/random) (- max min)) min))

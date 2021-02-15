@@ -108,6 +108,14 @@
   (let [id (aget e "target" "id")]
     (boolean (some (fn [edge] (= id edge)) edges))))
 
+(defn is-resizing?
+  []
+  (:resizing? @state-atom))
+
+(defn is-moving?
+  []
+  (:moving? @state-atom))
+
 (defn clamp
   [v max-value min-value]
   (min (max v min-value) max-value))

@@ -100,6 +100,8 @@
    [:button {:on-click (fn [] (trigger-event :random-cells 1000000)) :style {:margin-left "5px"}} "1000000"]])
 
 (defn rect-maker [props] (rr/rect-maker props))
+(defn is-resizing-rect? [] (rr/is-resizing?))
+(defn is-moving-rect? [] (rr/is-moving?))
 
 (defn app
   [{:keys [tree height width] :as state} bounds trigger-event]
@@ -108,10 +110,10 @@
                   :height   height
                   :width    width}}
     [show state bounds]
-    [rr/rect {:movable-area-width  width
-              :movable-area-height height
-              :on-move             (fn [{:keys [x y width height]}])
-              :on-resize           (fn [{:keys [x y width height]}])}]]
+    [rr/rect-maker {:movable-area-width  width
+                    :movable-area-height height
+                    :on-move             (fn [{:keys [x y width height]}])
+                    :on-resize           (fn [{:keys [x y width height]}])}]]
    [action-bar {:state state :trigger-event trigger-event}]])
 
 (defn add-mouse-window-handlers!
