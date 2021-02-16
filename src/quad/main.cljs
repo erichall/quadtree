@@ -14,15 +14,17 @@
             ))
 
 
-(tufte/add-basic-println-handler! {})
+(tufte/add-basic-println-handler!
+  {:format-pstats-opts {:columns [:n-calls :p50 :mean :clock :total]}})
+
 (declare render render-rect)
 
-(enable-console-print!)
+;(enable-console-print!)
 
 (defonce state-atom (atom nil))
 (when (nil? @state-atom)
   (reset! state-atom {:cells             []
-                      :width             1024
+                      :width             1024               ;; TODO hacked ugly inside tree.clj
                       :height            1024
                       :is-drawing-points false
                       ;; TODO
@@ -101,8 +103,11 @@
     (c/fill-rect x y 3 3 "red"))
 
   (c/stroke-style "yellow")
-  (doseq [{:keys [x y width height]} (qt/tree->bounds tree)]
-    (c/rect (- x width) (- y height) (* 2 width) (* 2 height) {:batch? true}))
+
+  ;(cljs.pprint/pprint (qt/tree->bounds tree))
+
+  (doseq [{:keys [x y width height] :as b} (qt/tree->bounds tree)]
+    (c/rect (- x width) (- y width) (* 2 width) (* 2 width) {:batch? true}))
   (c/stroke))
 
 (defn dispatch-worker
@@ -195,7 +200,14 @@
     ;                                                   :tree   initial-tree}} handle-event!)
 
 
-    (handle-event! :random-cells 100)
+    (handle-event! :random-cells 500)
+
+    ;(let [b (qt/tree->bounds (:tree @state-atom))]
+    ;  (cljs.pprint/pprint b)
+    ;  (println "duplicates " (- (count b) (count (into #{} b)))))
+
+
+    ;(cljs.pprint/pprint (:tree @state-atom))
 
     (comp/add-mouse-window-handlers! mouse-handler)
     ;; TOOOOODO
@@ -210,6 +222,9 @@
        [comp/controls]
        ]
       (. js/document (getElementById "app")))
+
+    (println "Total memory: " (Math/round (* (.-usedJSHeapSize js/performance.memory) 0.000001)) " mb")
+
     )
   )
 
@@ -220,10 +235,22 @@
   (println "Profile insert-cells , n = " n)
   (profile
     {}
-    (doall
-      (dotimes [_ 15]
-        (p (qt/insert-cells initial-tree (qt/make-cells n))))))
+    (dotimes [_ 20]
+      (qt/insert-cells initial-tree (qt/make-cells n))))
   )
+
+;(defn do-profile
+;  []
+;  (profile
+;    {}
+;    (dotimes [_ 10]
+;      (qt/in-bounds? {:x 0 :y 0 :width 200 :height 200} {:x 2 :y 2})
+;      (qt/insert initial-tree (ran))
+;      ))
+;  )
+
+;(profile-insert-cells 250)
+
 
 (comment
 
@@ -243,11 +270,9 @@
   (time (qt/random-cells 10000 1024 1024))
 
   (qt/insert-cells initial-tree (qt/make-cells 10))
-  (profile
-    {}
-    (doall
-      (dotimes [_ 15]
-        (p (qt/insert-cells initial-tree (qt/make-cells 1000000))))))
+
+
 
   (println (qt/in-tree? (:tree @state-atom) {:x 901, :y 95}))
   )
+

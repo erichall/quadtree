@@ -1,14 +1,30 @@
 (ns quad.tree
-  (:require [clojure.test :refer [is deftest]]))
+  (:require
+    [clojure.test :refer [is deftest]]))
+
+(set! *warn-on-reflection* true)
 
 (declare insert)
 
 (defrecord Cell [x y data])
-(defrecord Quadtree [capacity bounds cells nw ne sw se name depth])
+(defrecord Quadtree [capacity bounds cells nw ne sw se depth])
+
+;; TOOOOOODO
+(def capacity 4)
+(def root-bound-width 512)
 
 (defonce bounds-cache (atom nil))
 (when (nil? @bounds-cache)
   (reset! bounds-cache {}))
+
+(defn two-pow
+  "computes 2 ^ n"
+  {:test (fn []
+           (is (= (two-pow 2) 4))
+           (is (= (two-pow 3) (int (Math/pow 2 3))))
+           (is (= (two-pow 4) (int (Math/pow 2 4)))))}
+  [n]
+  (bit-shift-left 1 n))
 
 (defn num-map-vals?
   [m]
@@ -20,15 +36,18 @@
   (cond-> v val (conj val)))
 
 (defn make-tree
-  [{:keys [capacity bounds cells nw ne sw se name depth]
-    :or   {cells []
-           depth 0
-           name  ""
-           nw    nil
-           ne    nil
-           sw    nil
-           se    nil}}]
-  (Quadtree. capacity bounds cells nw ne sw se name depth))
+  [{:keys [bounds cells depth]}]
+  (let [t {:bounds bounds
+           :depth  ^byte (or depth 0)}]
+    (if cells
+      (assoc t :cells cells)
+      t))
+  ;(Quadtree. capacity bounds cells nw ne sw se depth)
+  )
+
+(defn width-from-depth
+  [depth]
+  (/ root-bound-width (two-pow depth)))
 
 (defn in-bounds?
   "Check if a given cell is within a boundary."
@@ -38,15 +57,28 @@
                                :height 200
                                :width  200}
                               {:x 665
-                               :y 294})
+                               :y 294}
+                              0)
                   true)))}
-  [{:keys [x y width height] :as bb} {cx :x cy :y :as p}]
-  (if (nil? bb)
-    false
-    (and (>= cx (- x width))
-         (<= cx (+ x width))
-         (>= cy (- y height))
-         (<= cy (+ y height)))))
+  [{:keys [x y]} {cx :x cy :y} depth]
+  (let [w (width-from-depth depth)]
+    (cond
+      (nil? x) false
+      (< cx (- x w)) false
+      (> cx (+ x w)) false
+      (< cy (- y w)) false
+      (> cy (+ y w)) false
+      :else true)
+    ;(if (nil? x)
+    ;  false
+    ;  (and (>= cx (- x w))
+    ;       (<= cx (+ x w))
+    ;       (>= cy (- y w))
+    ;       (<= cy (+ y w))))
+    )
+  )
+
+(def memo-in-bounds? (memoize in-bounds?))
 
 (defn intersects?
   {:test (fn []
@@ -64,31 +96,23 @@
                   true))
            )}
   [a b]
+  ;; TODO not done with removing width/height from bounds so need to pass it here..
   (not (or
          (> (- (:x a) (:width a)) (+ (:x b) (:width b)))
          (< (+ (:x a) (:width a)) (- (:x b) (:width b)))
-         (> (- (:y a) (:height a)) (+ (:y b) (:height b)))
-         (< (+ (:y a) (:height a)) (- (:y b) (:height b))))))
+         (> (- (:y a) (:height a)) (+ (:y b) (:width b)))
+         (< (+ (:y a) (:height a)) (- (:y b) (:width b))))))
 
 (defn split
-  "Split a boundary into four"
-  [{:keys [x y width height] :as b}]
-  {:pre [(num-map-vals? b)]}
-  (let [w (/ width 2)
-        h (/ height 2)]
-    {:b-nw {:x (- x w) :y (- y h) :height h :width w}
-     :b-ne {:x (+ x w) :y (- y h) :height h :width w}
-     :b-se {:x (+ x w) :y (+ y h) :height h :width w}
-     :b-sw {:x (- x w) :y (+ y h) :height h :width w}}))
-
-(defn two-pow
-  "computes 2 ^ n"
-  {:test (fn []
-           (is (= (two-pow 2) 4))
-           (is (= (two-pow 3) (int (Math/pow 2 3))))
-           (is (= (two-pow 4) (int (Math/pow 2 4)))))}
-  [n]
-  (bit-shift-left 1 n))
+  "Split a boundary into four
+    root-height / 2^depth = height and width
+  "
+  [{:keys [x y]} depth]
+  (let [w (width-from-depth depth)]
+    {:b-nw {:x (- x w) :y (- y w)}
+     :b-ne {:x (+ x w) :y (- y w)}
+     :b-se {:x (+ x w) :y (+ y w)}
+     :b-sw {:x (- x w) :y (+ y w)}}))
 
 (defn split-by-root-bounds
   [{:keys [x y width height]} depth]
@@ -112,6 +136,22 @@
         w (/ width td)
         h (/ height td)]
     {:x (- x w) :y (- y h) :height h :width w}))
+
+;; Actual bounds
+;; 0 {:x 512, :y 512, :width 512, :height 512}
+;; 1 nw {:x 256, :y 256, :height 256, :width 256}
+;; 1 ne {:x 768, :y 256, :height 256, :width 256}
+;;    2 nw {:x 640, :y 128, :height 128, :width 128}
+;;    2 ne {:x 896, :y 128, :height 128, :width 128}
+;;    2 se {:x 896, :y 384, :height 128, :width 128}
+;;    2 sw {:x 640, :y 384, :height 128, :width 128}
+;; 1 se {:x 768, :y 768, :height 256, :width 256}
+;; 1 sw {:x 256, :y 768, :height 256, :width 256}
+;; 512 / 2^1 = 256
+;; 512 / 2^2 = 128
+;; 512 / 2^3 = 64, yes level 3
+;; 512 / 2^4 = 32a yes lvl 4
+;; so root-height / 2^depth = height and width
 
 (def memo-split (memoize split))
 
@@ -150,48 +190,58 @@
                     [{:x 0 :y 0}]))
              (is (= (-> (insert tree {:x 0 :y 0}) (insert {:x 1 :y 1})
                         :cells)
-                    [{:x 0 :y 0} {:x 1 :y 1}]))
+                    [{:x 1 :y 1} {:x 0 :y 0}]))
              (is (= (-> (insert tree {:x 0 :y 0}) (insert {:x 1 :y 1}) (insert {:x 2 :y 2})
                         :cells)
-                    [{:x 0 :y 0} {:x 1 :y 1} {:x 2 :y 2}]))
+                    [{:x 2 :y 2} {:x 1 :y 1} {:x 0 :y 0}]))
              (is (= (-> (insert tree {:x 0 :y 0}) (insert {:x 1 :y 1}) (insert {:x 2 :y 2}) (insert {:x 3 :y 3})
                         :cells)
-                    [{:x 0 :y 0} {:x 1 :y 1} {:x 2 :y 2} {:x 3 :y 3}]))))}
-  [{:keys [capacity bounds cells nw ne se sw depth] :as tree} cell]
-  (cond
-    (not (in-bounds? bounds cell))
-    tree
+                    [{:x 3 :y 3} {:x 2 :y 2} {:x 1 :y 1} {:x 0 :y 0}]))))}
+  [{:keys [bounds cells nw ne se sw depth] :as tree} cell]
+  (let [next-depth (inc depth)]
+    (cond
+      (not (memo-in-bounds? bounds cell depth))
+      tree
 
-    ;; only insert new cells in leaf nodes, that is; we can insert it if we should split it later on
-    (and (split? tree) (< (count cells) capacity))
-    (update tree :cells conj cell)
+      ;; only insert new cells in leaf nodes, that is; we can insert it if we should split it later on
+      (and (split? tree) (< (count cells) capacity))
+      (update tree :cells conj cell)
 
-    ;; split the tree by clearing the current node cells and inserting them deeper (or higher?!)
-    (split? tree)
-    (let [new-depth (inc depth)
-          {:keys [b-nw b-ne b-se b-sw]} (memo-split bounds)]
-      (-> tree
-          (assoc :cells nil)                                ;; clear current cells
-          (assoc :nw (make-tree {:capacity capacity :bounds b-nw :name :nw :depth new-depth}))
-          (assoc :ne (make-tree {:capacity capacity :bounds b-ne :name :ne :depth new-depth}))
-          (assoc :se (make-tree {:capacity capacity :bounds b-se :name :se :depth new-depth}))
-          (assoc :sw (make-tree {:capacity capacity :bounds b-sw :name :sw :depth new-depth}))
-          (insert-cells (conj cells cell))))
+      ;; split the tree by clearing the current node cells and inserting them deeper (or higher?!)
+      (split? tree)
+      (let [{:keys [b-nw b-ne b-se b-sw]} (memo-split bounds next-depth)]
+        (-> tree
+            (dissoc :cells)                                 ;; clear current cells
+            (assoc :nw (make-tree {:bounds b-nw :depth next-depth}))
+            (assoc :ne (make-tree {:bounds b-ne :depth next-depth}))
+            (assoc :se (make-tree {:bounds b-se :depth next-depth}))
+            (assoc :sw (make-tree {:bounds b-sw :depth next-depth}))
+            (insert-cells (conj cells cell))))
 
-    (in-bounds? (:bounds nw) cell)
-    (assoc tree :nw (insert nw cell))
+      (memo-in-bounds? (:bounds nw) cell next-depth)
+      (assoc tree :nw (insert nw cell))
 
-    (in-bounds? (:bounds ne) cell)
-    (assoc tree :ne (insert ne cell))
+      (memo-in-bounds? (:bounds ne) cell next-depth)
+      (assoc tree :ne (insert ne cell))
 
-    (in-bounds? (:bounds se) cell)
-    (assoc tree :se (insert se cell))
+      (memo-in-bounds? (:bounds se) cell next-depth)
+      (assoc tree :se (insert se cell))
 
-    (in-bounds? (:bounds sw) cell)
-    (assoc tree :sw (insert sw cell))
+      (memo-in-bounds? (:bounds sw) cell next-depth)
+      (assoc tree :sw (insert sw cell))
 
-    :else
-    tree))
+      :else
+      tree)))
+
+(comment
+  (let [tree (make-tree {:capacity 4
+                         :bounds   {:x      200
+                                    :y      200
+                                    :width  200
+                                    :height 200}})]
+    (insert tree {:x 0 :y 0})
+    )
+  )
 
 
 (defn print-tree
@@ -385,11 +435,11 @@
                         tree->bounds)
                     [{:height 200 :width 200 :x 200 :y 200}]))))}
   ([tree] (tree->bounds tree []))
-  ([{:keys [bounds nw ne se sw]} bounds-acc]
+  ([{:keys [bounds nw ne se sw depth]} bounds-acc]
    (if (nil? nw)
-     (conj bounds-acc bounds)
+     (conj bounds-acc (assoc bounds :width (width-from-depth depth)))
      (concat
-       [bounds]
+       [(assoc bounds :width (width-from-depth depth))]
        (tree->bounds nw bounds-acc)
        (tree->bounds ne bounds-acc)
        (tree->bounds se bounds-acc)
@@ -414,7 +464,7 @@
                         (insert {:x 14 :y 11})
                         (insert {:x 4 :y 4})
                         (query target))
-                    [{:x 1 :y 1} {:x 2 :y 2} {:x 4 :y 4}]))
+                    [{:x 2 :y 2} {:x 1 :y 1} {:x 4 :y 4}]))
              (let [test-tree {:capacity 4,
                               :bounds   {:x 512, :y 512, :width 512, :height 512},
                               :cells    [],
@@ -462,22 +512,66 @@
                (is (= (query test-tree {:x 295, :y 461, :height 200, :width 200})
                       [{:x 422, :y 557}])))))}
   ([tree target-bounds] (query tree target-bounds []))
-  ([{:keys [nw ne se sw bounds cells]} target-bounds found]
+  ([{:keys [nw ne se sw bounds cells depth]} target-bounds found]
    (cond
-     (not (intersects? target-bounds bounds))
+     (not (intersects? target-bounds (assoc bounds :width (width-from-depth depth))))
      found
 
      (nil? nw)
-     (concat found (filter (fn [c] (in-bounds? target-bounds c)) cells))
+     (concat found (filter (fn [c] (in-bounds? target-bounds c depth)) cells))
 
      :else
-     (let [in-bounds (filter (fn [c] (in-bounds? target-bounds c)) cells)]
+     (let [in-bounds (filter (fn [c] (in-bounds? target-bounds c depth)) cells)]
        (concat
          in-bounds
          (query nw target-bounds [])
          (query ne target-bounds [])
          (query se target-bounds [])
          (query sw target-bounds []))))))
+
+(comment
+  (let [t {:capacity 4,
+           :bounds   {:x 512, :y 512, :width 512, :height 512},
+           :cells    [],
+           :nw       {:capacity 4,
+                      :bounds   {:x 256, :y 256, :height 256, :width 256},
+                      :cells    [],
+                      :nw       nil,
+                      :ne       nil,
+                      :sw       nil,
+                      :se       nil,
+                      :name     "nw"},
+           :ne       {:capacity 4,
+                      :bounds   {:x 768, :y 256, :height 256, :width 256},
+                      :cells    [{:x 665, :y 294}],
+                      :nw       nil,
+                      :ne       nil,
+                      :sw       nil,
+                      :se       nil,
+                      :name     "ne"},
+           :sw       {:capacity 4,
+                      :bounds   {:x 256, :y 768, :height 256, :width 256},
+                      :cells    [{:x 422, :y 557}],
+                      :nw       nil,
+                      :ne       nil,
+                      :sw       nil,
+                      :se       nil,
+                      :name     "sw"},
+           :se       {:capacity 4,
+                      :bounds   {:x 768, :y 768, :height 256, :width 256},
+                      :cells
+                                [{:x 672, :y 1013}],
+                      :nw       nil,
+                      :ne       nil,
+                      :sw       nil,
+                      :se       nil,
+                      :name     "se"},
+           :name     "start"}]
+    (query t {:x 0, :y 0, :height 200, :width 200})
+    )
+  )
+
+
 
 (def masks [0x00FF00FF 0x0F0F0F0F 0x33333333 0x55555555])
 (def shifts [8 4 2 1])
