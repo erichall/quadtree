@@ -10,6 +10,7 @@
                            [org.clojure/clojurescript "1.10.773"]
                            [com.taoensso/tufte "2.2.0"]
                            [shodan "0.4.2"]
+                           [criterium "0.4.6"]
                            [org.clojure/core.async  "0.4.500"]]
 
             :plugins [[lein-figwheel "0.5.20"]

@@ -2,6 +2,7 @@
 
  :dependencies [[reagent "1.0.0"]
                 [shodan "0.4.2"]
+                [criterium "0.4.6"]
                 [com.taoensso/tufte "2.2.0"]]
 
  :dev-http     {3449 "resources/public/"}
