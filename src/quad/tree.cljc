@@ -1,10 +1,10 @@
 (ns quad.tree
   (:require
     [clojure.test :refer [is deftest]]
-    [criterium.core :as c]
+    ;[criterium.core :as c]
     ))
 
-(set! *warn-on-reflection* true)
+;(set! *warn-on-reflection* true)
 
 (declare insert)
 
@@ -472,10 +472,10 @@
              ;       [{:x 2 :y 2} {:x 1 :y 1} {:x 4 :y 4}]))
              (let [test-tree {:capacity 4,
                               :bounds   {:x 512, :y 512, :width 512, :height 512},
-                              :depth 0
+                              :depth    0
                               :cells    [],
                               :nw       {:capacity 4,
-                                         :depth 1
+                                         :depth    1
                                          :bounds   {:x 256, :y 256, :height 256, :width 256},
                                          :cells    [],
                                          :nw       nil,
@@ -484,7 +484,7 @@
                                          :se       nil,
                                          :name     "nw"},
                               :ne       {:capacity 4,
-                                         :depth 1
+                                         :depth    1
                                          :bounds   {:x 768, :y 256, :height 256, :width 256},
                                          :cells    [{:x 981, :y 286} {:x 665, :y 294}],
                                          :nw       nil,
@@ -493,7 +493,7 @@
                                          :se       nil,
                                          :name     "ne"},
                               :sw       {:capacity 4,
-                                         :depth 1
+                                         :depth    1
                                          :bounds   {:x 256, :y 768, :height 256, :width 256},
                                          :cells
                                                    [{:x 422, :y 557}
@@ -506,7 +506,7 @@
                                          :se       nil,
                                          :name     "sw"},
                               :se       {:capacity 4,
-                                         :depth 1
+                                         :depth    1
                                          :bounds   {:x 768, :y 768, :height 256, :width 256},
                                          :cells
                                                    [{:x 672, :y 1013}
@@ -609,7 +609,18 @@
 
   (with-out-str (time (random-cells 1000000 1024 1024)))
 
-
+  (let [cells (random-cells 500 500 500)
+        tree (make-tree {:capacity 4
+                         :bounds   {:x 512
+                                    :y 512}})
+        ]
+    (c/with-progress-reporting
+      (c/quick-bench
+        (insert-cells tree cells)
+        :verbose
+        )
+      )
+    )
 
   )
 
