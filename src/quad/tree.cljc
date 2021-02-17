@@ -15,10 +15,6 @@
 (def capacity 4)
 (def root-bound-width 512)
 
-(defonce bounds-cache (atom nil))
-(when (nil? @bounds-cache)
-  (reset! bounds-cache {}))
-
 (defn two-pow
   "computes 2 ^ n"
   {:test (fn []
@@ -43,9 +39,7 @@
            :depth  ^byte (or depth 0)}]
     (if cells
       (assoc t :cells cells)
-      t))
-  ;(Quadtree. capacity bounds cells nw ne sw se depth)
-  )
+      t)))
 
 (defn width-from-depth
   [depth]
@@ -70,16 +64,7 @@
       (> cx (+ x w)) false
       (< cy (- y w)) false
       (> cy (+ y w)) false
-      :else true)
-    ;(if (nil? x)
-    ;  false
-    ;  (and (>= cx (- x w))
-    ;       (<= cx (+ x w))
-    ;       (>= cy (- y w))
-    ;       (<= cy (+ y w))))
-    )
-  )
-
+      :else true)))
 (def memo-in-bounds? (memoize in-bounds?))
 
 (defn intersects?
@@ -95,74 +80,24 @@
                   true))
            (is (= (intersects? {:x 295 :y 461 :height 200 :width 200}
                                {:x 512 :y 512 :width 512 :height 512})
-                  true))
-           )}
-  [a b]
-  ;; TODO not done with removing width/height from bounds so need to pass it here..
+                  true)))}
+  [target-bounds b]
   (not (or
-         (> (- (:x a) (:width a)) (+ (:x b) (:width b)))
-         (< (+ (:x a) (:width a)) (- (:x b) (:width b)))
-         (> (- (:y a) (:height a)) (+ (:y b) (:width b)))
-         (< (+ (:y a) (:height a)) (- (:y b) (:width b))))))
+         (> (- (:x target-bounds) (:width target-bounds)) (+ (:x b) (:width b)))
+         (< (+ (:x target-bounds) (:width target-bounds)) (- (:x b) (:width b)))
+         (> (- (:y target-bounds) (:height target-bounds)) (+ (:y b) (:width b)))
+         (< (+ (:y target-bounds) (:height target-bounds)) (- (:y b) (:width b))))))
 
 (defn split
   "Split a boundary into four
-    root-height / 2^depth = height and width
-  "
+    root-height / 2^depth = height and width"
   [{:keys [x y]} depth]
   (let [w (width-from-depth depth)]
     {:b-nw {:x (- x w) :y (- y w)}
      :b-ne {:x (+ x w) :y (- y w)}
      :b-se {:x (+ x w) :y (+ y w)}
      :b-sw {:x (- x w) :y (+ y w)}}))
-
-(defn split-by-root-bounds
-  [{:keys [x y width height]} depth]
-  (let [td (two-pow depth)
-        w (/ width td)
-        h (/ height td)]
-    {:b-nw {:x (- x w) :y (- y h) :height h :width w}
-     :b-ne {:x (+ x w) :y (- y h) :height h :width w}
-     :b-se {:x (+ x w) :y (+ y h) :height h :width w}
-     :b-sw {:x (- x w) :y (+ y h) :height h :width w}}))
-
-(defn bounds-by-depth
-  {:test (fn []
-           ;; TODO Fails
-           ;(is (= (bounds-by-depth {:x 200, :y 200, :width 200, :height 200} 0)
-           ;       {:x 200, :y 200, :width 200, :height 200}
-           ;       ))
-           )}
-  [{:keys [x y width height]} depth]
-  (let [td (two-pow depth)
-        w (/ width td)
-        h (/ height td)]
-    {:x (- x w) :y (- y h) :height h :width w}))
-
-;; Actual bounds
-;; 0 {:x 512, :y 512, :width 512, :height 512}
-;; 1 nw {:x 256, :y 256, :height 256, :width 256}
-;; 1 ne {:x 768, :y 256, :height 256, :width 256}
-;;    2 nw {:x 640, :y 128, :height 128, :width 128}
-;;    2 ne {:x 896, :y 128, :height 128, :width 128}
-;;    2 se {:x 896, :y 384, :height 128, :width 128}
-;;    2 sw {:x 640, :y 384, :height 128, :width 128}
-;; 1 se {:x 768, :y 768, :height 256, :width 256}
-;; 1 sw {:x 256, :y 768, :height 256, :width 256}
-;; 512 / 2^1 = 256
-;; 512 / 2^2 = 128
-;; 512 / 2^3 = 64, yes level 3
-;; 512 / 2^4 = 32a yes lvl 4
-;; so root-height / 2^depth = height and width
-
 (def memo-split (memoize split))
-
-(defn split?
-  {:test (fn []
-           (is (= (split? {:nw 1 :ne 1 :sw 1 :se 1}) false))
-           (is (= (split? nil) true)))}
-  [{:keys [nw]}]
-  (nil? nw))
 
 (defn insert-cells
   [tree cells]
@@ -171,15 +106,6 @@
 (defn make-cells
   [n]
   (reduce (fn [cells i] (conj cells {:x i :y i})) [] (range (inc n))))
-
-(defn cache-bounds!
-  [bounds]
-  (swap! bounds-cache (fn [bb] (reduce (fn [bbs b] (assoc bbs b 1)) bb (vals bounds)))))
-
-(defn room-order
-  [{:keys [nw ne se sw] :as t}]
-  (->> (map vector [:nw :ne :se :sw] (map count [(or (:cells nw) []) (or (:cells ne) []) (or (:cells se) []) (or (:cells sw) [])]))
-       (sort-by second)))
 
 (defn insert
   {:test (fn []
@@ -206,11 +132,11 @@
       tree
 
       ;; only insert new cells in leaf nodes, that is; we can insert it if we should split it later on
-      (and (split? tree) (< (count cells) capacity))
+      (and (nil? nw) (< (count cells) capacity))
       (update tree :cells conj cell)
 
       ;; split the tree by clearing the current node cells and inserting them deeper (or higher?!)
-      (split? tree)
+      (nil? nw)
       (let [{:keys [b-nw b-ne b-se b-sw]} (memo-split bounds next-depth)]
         (-> tree
             (dissoc :cells)                                 ;; clear current cells
@@ -260,47 +186,6 @@
       (print-tree sw))
     )
   )
-
-(comment
-  (let [tree (make-tree {:capacity 4
-                         :bounds   {:x      200
-                                    :y      200
-                                    :width  200
-                                    :height 200}})]
-    ;(with-out-str
-    (-> (insert-cells tree [
-                            ;{:x 0 :y 0}
-                            ;{:x 250 :y 0}
-                            ;{:x 0 :y 250}
-                            ;{:x 250 :y 250}
-                            ;{:x 1 :y 1}
-                            {:x 0 :y 0}
-                            {:x 1 :y 1}
-                            {:x 2 :y 2}
-                            {:x 3 :y 3}
-                            {:x 4 :y 4}
-
-                            ])
-        print-tree
-        )
-    ;)
-    )
-  )
-
-(defn flatten-tree
-  [tree]
-  (loop [{:keys [cells bounds nw ne se sw]} tree
-         flat-tree []]
-    (cond
-      (nil? tree) nil
-      (empty? cells) nil
-      :else (-> (condj flat-tree
-                       (when (seq cells)
-                         {:cells cells :bounds bounds}))
-                (condj (flatten-tree nw))
-                (condj (flatten-tree ne))
-                (condj (flatten-tree se))
-                (condj (flatten-tree sw))))))
 
 (defonce random-seed-atom (atom 1))
 (defn random-int
@@ -357,17 +242,6 @@
         (in-tree? ne cell)
         (in-tree? se cell)
         (in-tree? sw cell))))
-
-(comment
-  (let [t (make-tree {:capacity 4
-                      :bounds   {:x      200
-                                 :y      200
-                                 :width  200
-                                 :height 200}})]
-    (insert-cells t (into [] (random-cells 100 200 200)))
-    (in-tree? (insert-cells t (into [] (random-cells 100 200 200))) {:x 0 :y 0})
-    )
-  )
 
 (defn tree->cells
   {:test (fn []
@@ -577,11 +451,80 @@
                       :se       nil,
                       :name     "se"},
            :name     "start"}]
-    (query t {:x 0, :y 0, :height 200, :width 200})
+    (query t {:x 0, :y 0, :height 200, :width 200})))
+
+(defn concat-cells
+  [t1 t2]
+  (let [t1-cells (:cells t1)
+        t2-cells (:cells t2)]
+    (concat (or t1-cells []) (or t2-cells []))))
+
+(defn merge-tree
+  "Merges t2 into t1.
+
+  we must first be on the same depth as both t1 and t2.
+  If we not on the same level, we need to submerge down into t1 with the new tree t2.
+
+    case 1: t1.depth > t2.depth
+            (merge t1.nw, t2)...
+    case 2: t1.depth < t2.depth
+             (merge t2.nw, t1) ...
+    case 3: t1.depth + 1 === t2.depth // look down and determine what type of bounds t2 has
+            directions = get-bounds (t1.depth + 1)
+
+            if(directions.nw === t2.bounds)
+                if (t1.depth+1.nw === nil?)
+                    (assoc t1 :nw t2)
+                else
+                    cells-inserted <- (insert-cells t2 (t1.depth + 1).cells)
+                    (assoc t1 :nw cells-inserted)
+  "
+  {:test (fn []
+           (let [t1 {:bounds {:x 512, :y 512, :width 512, :height 512},
+                     :depth  0,
+                     :nw     {:bounds {:x 256, :y 256},
+                              :depth  1,
+                              :nw     {:bounds {:x 128, :y 128},
+                                       :depth  2,
+                                       :nw     {:bounds {:x 64, :y 64},
+                                                :depth  3,
+                                                :cells  ({:x 48, :y 124} {:x 11, :y 66} {:x 57, :y 107})},
+                                       :ne     {:bounds {:x 192, :y 64}, :depth 3, :cells ({:x 198, :y 40})},
+                                       :se     nil          ;; should be merged into here
+                                       :sw     {:bounds {:x 64, :y 192},
+                                                :depth  3,
+                                                :nw     {:bounds {:x 32, :y 160}, :depth 4, :cells ({:x 24, :y 185})},
+                                                :ne     {:bounds {:x 96, :y 160}, :depth 4, :cells ({:x 126, :y 134})},
+                                                :se     {:bounds {:x 96, :y 224}, :depth 4, :cells ({:x 86, :y 223})},
+                                                :sw     {:bounds {:x 32, :y 224},
+                                                         :depth  4,
+                                                         :cells  ({:x 41, :y 227} {:x 10, :y 244})}}}}}
+
+                 t2 {:bounds {:x 192, :y 192},
+                     :depth  3,
+                     :cells  ({:x 168, :y 221} {:x 154, :y 193})}])
+
+           )}
+  [t1 t2]
+  (cond
+    (= (inc (:depth t1)) (:depth t2))
+    (let [d (:depth t2)
+          t2-b (:bounds t2)
+          {:keys [b-nw b-ne b-se b-sw]} (split (:bounds t1) d)]
+      (cond
+        (and (= t2-b b-nw) (nil? (:nw t1)))
+        (assoc t1 :nw t2)
+
+        (= t2-b b-nw)
+        (let [new-cells (concat-cells (:nw t1) t2)]
+
+          )
+        )
+
+      )
     )
+
   )
-
-
 
 (def masks [0x00FF00FF 0x0F0F0F0F 0x33333333 0x55555555])
 (def shifts [8 4 2 1])
@@ -600,8 +543,6 @@
     (sort-by :z-ord)))
 
 (comment
-
-  (cljs.pprint/pprint @bounds-cache)
 
   (sort-by :x [{:x 1 :y 1} {:x 0 :y 0}])
 
