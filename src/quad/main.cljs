@@ -61,7 +61,7 @@
                       (console/time-start "insert-random-cells")
                       (->> cells
                            ;qt/sort-cells-by-z-order
-                           (qt/insert-cells initial-tree)
+                           (qt/insert-cells initial-tree true)
                            (swap! state-atom assoc :tree)
                            (swap! state-atom assoc :cells cells)
                            )
