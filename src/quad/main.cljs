@@ -200,14 +200,14 @@
     ;                                                   :tree   initial-tree}} handle-event!)
 
 
-    (handle-event! :random-cells 150)
+    (handle-event! :random-cells 100000)
 
     ;(let [b (qt/tree->bounds (:tree @state-atom))]
     ;  (cljs.pprint/pprint b)
     ;  (println "duplicates " (- (count b) (count (into #{} b)))))
 
 
-    (cljs.pprint/pprint (:tree @state-atom))
+    ;(cljs.pprint/pprint (:tree @state-atom))
 
     (comp/add-mouse-window-handlers! mouse-handler)
     ;; TOOOOODO

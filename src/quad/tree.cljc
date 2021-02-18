@@ -56,16 +56,36 @@
                                :y 294}
                               0)
                   true)))}
-  [{:keys [x y]} {cx :x cy :y} depth]
+  [{:keys [x y]} point depth]
   (let [w (width-from-depth depth)]
-    (cond
-      (nil? x) false
-      (< cx (- x w)) false
-      (> cx (+ x w)) false
-      (< cy (- y w)) false
-      (> cy (+ y w)) false
-      :else true)))
+    ;(cond
+    ;  (nil? x) false
+    ;  (< cx (- x w)) false
+    ;  (> cx (+ x w)) false
+    ;  (< cy (- y w)) false
+    ;  (> cy (+ y w)) false
+    ;  :else true)
+    (if (nil? x)
+      false
+      (and (>= (:x point) (- x w))
+           (<= (:x point) (+ x w))
+           (>= (:y point) (- y w))
+           (<= (:y point) (+ y w))))))
+
+
 (def memo-in-bounds? (memoize in-bounds?))
+
+(defn in-target-bounds?
+  "Check if a given cell is within a boundary."
+  [{:keys [x y width height]} {cx :x cy :y}]
+  (cond
+    (nil? x) false
+    (< cx (- x width)) false
+    (> cx (+ x width)) false
+    (< cy (- y height)) false
+    (> cy (+ y height)) false
+    :else true))
+
 
 (defn intersects?
   {:test (fn []
@@ -97,11 +117,26 @@
      :b-ne {:x (+ x w) :y (- y w)}
      :b-se {:x (+ x w) :y (+ y w)}
      :b-sw {:x (- x w) :y (+ y w)}}))
+
+(defn nw-split
+  [bounds w]
+  {:x (- (:x bounds) w) :y (- (:y bounds) w)})
+(defn ne-split
+  [bounds w]
+  {:x (+ (:x bounds) w) :y (- (:y bounds) w)})
+(defn se-split
+  [bounds w]
+  {:x (+ (:x bounds) w) :y (+ (:y bounds) w)})
+(defn sw-split
+  [bounds w]
+  {:x (- (:x bounds) w) :y (+ (:y bounds) w)})
+
 (def memo-split (memoize split))
 
 (defn insert-cells
   [tree cells]
-  (reduce (fn [acc-tree c] (insert acc-tree c)) tree cells))
+  (let [z-order (sort-cells-by-z-order cells)]
+    (reduce (fn [acc-tree c] (insert acc-tree c)) tree z-order)))
 
 (defn make-cells
   [n]
@@ -125,38 +160,42 @@
              (is (= (-> (insert tree {:x 0 :y 0}) (insert {:x 1 :y 1}) (insert {:x 2 :y 2}) (insert {:x 3 :y 3})
                         :cells)
                     [{:x 3 :y 3} {:x 2 :y 2} {:x 1 :y 1} {:x 0 :y 0}]))))}
-  [{:keys [bounds cells nw ne se sw depth] :as tree} cell]
-  (let [next-depth (inc depth)]
+  [tree cell]
+  (let [next-depth (inc (:depth tree))]
     (cond
-      (not (memo-in-bounds? bounds cell depth))
+      (not (memo-in-bounds? (:bounds tree) cell (:depth tree)))
       tree
 
       ;; only insert new cells in leaf nodes, that is; we can insert it if we should split it later on
-      (and (nil? nw) (< (count cells) capacity))
+      (and (nil? (:nw tree)) (< (count (:cells tree)) capacity))
       (update tree :cells conj cell)
 
       ;; split the tree by clearing the current node cells and inserting them deeper (or higher?!)
-      (nil? nw)
-      (let [{:keys [b-nw b-ne b-se b-sw]} (memo-split bounds next-depth)]
+      (nil? (:nw tree))
+      (let [w (width-from-depth next-depth)
+            cells (conj (:cells tree) cell)]
         (-> tree
             (dissoc :cells)                                 ;; clear current cells
-            (assoc :nw (make-tree {:bounds b-nw :depth next-depth}))
-            (assoc :ne (make-tree {:bounds b-ne :depth next-depth}))
-            (assoc :se (make-tree {:bounds b-se :depth next-depth}))
-            (assoc :sw (make-tree {:bounds b-sw :depth next-depth}))
-            (insert-cells (conj cells cell))))
+            (assoc :nw (-> (make-tree {:bounds (nw-split (:bounds tree) w) :depth next-depth})
+                           (insert-cells cells)))
+            (assoc :ne (-> (make-tree {:bounds (ne-split (:bounds tree) w) :depth next-depth})
+                           (insert-cells cells)))
+            (assoc :se (-> (make-tree {:bounds (se-split (:bounds tree) w) :depth next-depth})
+                           (insert-cells cells)))
+            (assoc :sw (-> (make-tree {:bounds (sw-split (:bounds tree) w) :depth next-depth})
+                           (insert-cells cells)))))
 
-      (memo-in-bounds? (:bounds nw) cell next-depth)
-      (assoc tree :nw (insert nw cell))
+      (memo-in-bounds? (:bounds (:nw tree)) cell next-depth)
+      (assoc tree :nw (insert (:nw tree) cell))
 
-      (memo-in-bounds? (:bounds ne) cell next-depth)
-      (assoc tree :ne (insert ne cell))
+      (memo-in-bounds? (:bounds (:ne tree)) cell next-depth)
+      (assoc tree :ne (insert (:ne tree) cell))
 
-      (memo-in-bounds? (:bounds se) cell next-depth)
-      (assoc tree :se (insert se cell))
+      (memo-in-bounds? (:bounds (:se tree)) cell next-depth)
+      (assoc tree :se (insert (:se tree) cell))
 
-      (memo-in-bounds? (:bounds sw) cell next-depth)
-      (assoc tree :sw (insert sw cell))
+      (memo-in-bounds? (:bounds (:sw tree)) cell next-depth)
+      (assoc tree :sw (insert (:sw tree) cell))
 
       :else
       tree)))
@@ -334,16 +373,15 @@
                          :y      0
                          :width  10
                          :height 10}]
-             ;; TODO fix global width................
-             ;(is (= (-> (insert tree {:x 1 :y 1})
-             ;           (insert {:x 2 :y 2})
-             ;           (insert {:x 11 :y 11})
-             ;           (insert {:x 12 :y 11})
-             ;           (insert {:x 13 :y 11})
-             ;           (insert {:x 14 :y 11})
-             ;           (insert {:x 4 :y 4})
-             ;           (query target))
-             ;       [{:x 2 :y 2} {:x 1 :y 1} {:x 4 :y 4}]))
+             (is (= (-> (insert tree {:x 1 :y 1})
+                        (insert {:x 2 :y 2})
+                        (insert {:x 11 :y 11})
+                        (insert {:x 12 :y 11})
+                        (insert {:x 13 :y 11})
+                        (insert {:x 14 :y 11})
+                        (insert {:x 4 :y 4})
+                        (query target))
+                    [{:x 4 :y 4} {:x 2 :y 2} {:x 1 :y 1}]))
              (let [test-tree {:capacity 4,
                               :bounds   {:x 512, :y 512, :width 512, :height 512},
                               :depth    0
@@ -394,7 +432,9 @@
                                          :name     "se"},
                               :name     "start"}]
                (is (= (query test-tree {:x 295, :y 461, :height 200, :width 200})
-                      [{:x 422, :y 557}])))))}
+                      [{:x 422, :y 557}])))
+             )
+           )}
   ([tree target-bounds] (query tree target-bounds []))
   ([{:keys [nw ne se sw bounds cells depth]} target-bounds found]
    (cond
@@ -402,10 +442,10 @@
      found
 
      (nil? nw)
-     (concat found (filter (fn [c] (in-bounds? target-bounds c depth)) cells))
+     (concat found (filter (fn [c] (in-target-bounds? target-bounds c)) cells))
 
      :else
-     (let [in-bounds (filter (fn [c] (in-bounds? target-bounds c depth)) cells)]
+     (let [in-bounds (filter (fn [c] (in-target-bounds? target-bounds c)) cells)]
        (concat
          in-bounds
          (query nw target-bounds [])
@@ -457,74 +497,8 @@
   [t1 t2]
   (let [t1-cells (:cells t1)
         t2-cells (:cells t2)]
+    (println "t1-cells " t1-cells "t2-cells " t2-cells)
     (concat (or t1-cells []) (or t2-cells []))))
-
-(defn merge-tree
-  "Merges t2 into t1.
-
-  we must first be on the same depth as both t1 and t2.
-  If we not on the same level, we need to submerge down into t1 with the new tree t2.
-
-    case 1: t1.depth > t2.depth
-            (merge t1.nw, t2)...
-    case 2: t1.depth < t2.depth
-             (merge t2.nw, t1) ...
-    case 3: t1.depth + 1 === t2.depth // look down and determine what type of bounds t2 has
-            directions = get-bounds (t1.depth + 1)
-
-            if(directions.nw === t2.bounds)
-                if (t1.depth+1.nw === nil?)
-                    (assoc t1 :nw t2)
-                else
-                    cells-inserted <- (insert-cells t2 (t1.depth + 1).cells)
-                    (assoc t1 :nw cells-inserted)
-  "
-  {:test (fn []
-           (let [t1 {:bounds {:x 512, :y 512, :width 512, :height 512},
-                     :depth  0,
-                     :nw     {:bounds {:x 256, :y 256},
-                              :depth  1,
-                              :nw     {:bounds {:x 128, :y 128},
-                                       :depth  2,
-                                       :nw     {:bounds {:x 64, :y 64},
-                                                :depth  3,
-                                                :cells  ({:x 48, :y 124} {:x 11, :y 66} {:x 57, :y 107})},
-                                       :ne     {:bounds {:x 192, :y 64}, :depth 3, :cells ({:x 198, :y 40})},
-                                       :se     nil          ;; should be merged into here
-                                       :sw     {:bounds {:x 64, :y 192},
-                                                :depth  3,
-                                                :nw     {:bounds {:x 32, :y 160}, :depth 4, :cells ({:x 24, :y 185})},
-                                                :ne     {:bounds {:x 96, :y 160}, :depth 4, :cells ({:x 126, :y 134})},
-                                                :se     {:bounds {:x 96, :y 224}, :depth 4, :cells ({:x 86, :y 223})},
-                                                :sw     {:bounds {:x 32, :y 224},
-                                                         :depth  4,
-                                                         :cells  ({:x 41, :y 227} {:x 10, :y 244})}}}}}
-
-                 t2 {:bounds {:x 192, :y 192},
-                     :depth  3,
-                     :cells  ({:x 168, :y 221} {:x 154, :y 193})}])
-
-           )}
-  [t1 t2]
-  (cond
-    (= (inc (:depth t1)) (:depth t2))
-    (let [d (:depth t2)
-          t2-b (:bounds t2)
-          {:keys [b-nw b-ne b-se b-sw]} (split (:bounds t1) d)]
-      (cond
-        (and (= t2-b b-nw) (nil? (:nw t1)))
-        (assoc t1 :nw t2)
-
-        (= t2-b b-nw)
-        (let [new-cells (concat-cells (:nw t1) t2)]
-
-          )
-        )
-
-      )
-    )
-
-  )
 
 (def masks [0x00FF00FF 0x0F0F0F0F 0x33333333 0x55555555])
 (def shifts [8 4 2 1])
@@ -548,16 +522,22 @@
 
   (concat [1] [1 2 3] [4])
 
-  (with-out-str (time (random-cells 1000000 1024 1024)))
+  (with-out-str (time (random-cells 10000 1024 1024)))
 
-  (let [cells (random-cells 500 500 500)
+  (time (sort-cells-by-z-order (random-cells 1000 100 100)
+                               ))
+
+  (let [cells (-> (random-cells 100000 1000 1000)
+                  sort-cells-by-z-order
+                  )
         tree (make-tree {:capacity 4
-                         :bounds   {:x 512
-                                    :y 512}})
-        ]
+                         :bounds   {:x 2048
+                                    :y 2048}})]
+
     (c/with-progress-reporting
       (c/quick-bench
         (insert-cells tree cells)
+        ;(sort-cells-by-z-order cells)
         :verbose
         )
       )
