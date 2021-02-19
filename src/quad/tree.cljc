@@ -180,25 +180,36 @@
       (not (memo-in-bounds? (:bounds tree) cell (:depth tree)))
       tree
 
-      ;; only insert new cells in leaf nodes, that is; we can insert it if we should split it later on
       (and (nil? (:nw tree)) (< (count (:cells tree)) capacity))
       (update tree :cells conj cell)
 
-      ;; split the tree by clearing the current node cells and inserting them deeper (or higher?!)
       (nil? (:nw tree))
       (let [w (width-from-depth next-depth)
-            cells (conj (:cells tree) cell)]
+            cells (conj (:cells tree) cell)
+            nw-b (nw-split (:bounds tree) w)
+            ne-b (ne-split (:bounds tree) w)
+            se-b (se-split (:bounds tree) w)
+            sw-b (sw-split (:bounds tree) w)
+            split-cells (reduce (fn [split-cells cell]
+                                  (cond
+                                    (in-bounds? nw-b cell next-depth) (update split-cells :nw conj cell)
+                                    (in-bounds? ne-b cell next-depth) (update split-cells :ne conj cell)
+                                    (in-bounds? se-b cell next-depth) (update split-cells :se conj cell)
+                                    (in-bounds? sw-b cell next-depth) (update split-cells :sw conj cell)
+                                    )) {:nw []
+                                        :ne []
+                                        :se []
+                                        :sw []} cells)]
         (-> tree
-            (dissoc :cells)                                 ;; clear current cells
-            ;; TODO cells can get inserted into multiple trees now!
+            (dissoc :cells)
             (assoc :nw (-> (make-tree {:bounds (nw-split (:bounds tree) w) :depth next-depth})
-                           (insert-cells cells)))
+                           (insert-cells (:nw split-cells))))
             (assoc :ne (-> (make-tree {:bounds (ne-split (:bounds tree) w) :depth next-depth})
-                           (insert-cells cells)))
+                           (insert-cells (:ne split-cells))))
             (assoc :se (-> (make-tree {:bounds (se-split (:bounds tree) w) :depth next-depth})
-                           (insert-cells cells)))
+                           (insert-cells (:se split-cells))))
             (assoc :sw (-> (make-tree {:bounds (sw-split (:bounds tree) w) :depth next-depth})
-                           (insert-cells cells)))))
+                           (insert-cells (:sw split-cells))))))
 
       (memo-in-bounds? (:bounds (:nw tree)) cell next-depth)
       (assoc tree :nw (insert (:nw tree) cell))
@@ -320,11 +331,11 @@
                           (sort-by :x)
                           (sort-by :y))]
                ;; TODO awesome tests, fix insert TODO
-               ;(is (= (->> (insert-cells tree r)
-               ;            tree->cells
-               ;            (sort-by :x)
-               ;            (sort-by :y))
-               ;       r))
+               (is (= (->> (insert-cells tree r)
+                           tree->cells
+                           (sort-by :x)
+                           (sort-by :y))
+                      r))
                )
              ;(let [r (->> (into [] (random-cells 200 200 200))
              ;             (sort-by :x)
