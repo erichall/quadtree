@@ -199,7 +199,7 @@
     ;                                                   :tree   initial-tree}} handle-event!)
 
 
-    (handle-event! :random-cells 100000)
+    (handle-event! :random-cells 100)
 
     ;(let [b (qt/tree->bounds (:tree @state-atom))]
     ;  (cljs.pprint/pprint b)

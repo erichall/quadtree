@@ -4,8 +4,6 @@
     ;[criterium.core :as c]
     ))
 
-;(set! *warn-on-reflection* true)
-
 (declare insert)
 
 (defrecord Cell [x y data])
@@ -43,7 +41,6 @@
   [{:keys [x y]}]
   (bit-or (shifter x) (bit-shift-left (shifter y) 1)))
 
-
 (defn sort-cells-by-z-order
   [cells]
   (->>
@@ -75,13 +72,6 @@
                   true)))}
   [{:keys [x y]} point depth]
   (let [w (width-from-depth depth)]
-    ;(cond
-    ;  (nil? x) false
-    ;  (< cx (- x w)) false
-    ;  (> cx (+ x w)) false
-    ;  (< cy (- y w)) false
-    ;  (> cy (+ y w)) false
-    ;  :else true)
     (if (nil? x)
       false
       (and (>= (:x point) (- x w))
@@ -461,9 +451,7 @@
                                          :name     "se"},
                               :name     "start"}]
                (is (= (query test-tree {:x 295, :y 461, :height 200, :width 200})
-                      [{:x 422, :y 557}])))
-             )
-           )}
+                      [{:x 422, :y 557}])))))}
   ([tree target-bounds] (query tree target-bounds []))
   ([{:keys [nw ne se sw bounds cells depth]} target-bounds found]
    (cond
@@ -528,9 +516,6 @@
         t2-cells (:cells t2)]
     (println "t1-cells " t1-cells "t2-cells " t2-cells)
     (concat (or t1-cells []) (or t2-cells []))))
-
-
-
 
 (comment
 
