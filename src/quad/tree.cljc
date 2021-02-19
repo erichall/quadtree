@@ -102,7 +102,6 @@
     (> cy (+ y height)) false
     :else true))
 
-
 (defn intersects?
   {:test (fn []
            (is (= (intersects? {:x 495 :y 190 :height 200 :width 200}
@@ -150,10 +149,8 @@
 (def memo-split (memoize split))
 
 (defn insert-cells
-  ([tree cells] (insert-cells tree cells false))
-  ([tree cells z-order?]
-   (let [z-order (if z-order? (sort-cells-by-z-order cells) cells)]
-     (reduce (fn [acc-tree c] (insert acc-tree c)) tree z-order))))
+  [tree cells]
+  (reduce (fn [acc-tree c] (insert acc-tree c)) tree cells))
 
 (defn make-cells
   [n]

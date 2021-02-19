@@ -60,11 +60,10 @@
 
                       (console/time-start "insert-random-cells")
                       (->> cells
-                           ;qt/sort-cells-by-z-order
-                           (qt/insert-cells initial-tree true)
+                           qt/sort-cells-by-z-order
+                           (qt/insert-cells initial-tree)
                            (swap! state-atom assoc :tree)
-                           (swap! state-atom assoc :cells cells)
-                           )
+                           (swap! state-atom assoc :cells cells))
                       (console/time-end "insert-random-cells")
                       (raf-render @state-atom))
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
