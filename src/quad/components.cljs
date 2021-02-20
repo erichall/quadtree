@@ -1,6 +1,6 @@
 (ns quad.components
   (:require [reagent.core :as r]
-            [quad.util :refer [listen]]
+            [quad.util :refer [listen client-x client-y]]
             [cljs.core.async :as async]
             [quad.resizable-rect :as rr]))
 
@@ -100,8 +100,12 @@
    [:button {:on-click (fn [] (trigger-event :random-cells 1000000)) :style {:margin-left "5px"}} "1000000"]])
 
 (defn rect-maker [props] (rr/rect-maker props))
+(defn resizable-rect [props] (rr/component props))
+(defn rect-mouse-handler [args] (rr/mouse-handler args))
 (defn is-resizing-rect? [] (rr/is-resizing?))
 (defn is-moving-rect? [] (rr/is-moving?))
+(defn event-is-resize? [js-evt] (rr/is-resize? js-evt))
+(defn event-is-move? [js-evt] (rr/is-move? js-evt "movable-rect")) ;TODO auch
 
 (defn app
   [{:keys [tree height width] :as state} bounds trigger-event]
@@ -129,18 +133,41 @@
 (defn mouse-handler
   [e]
   (let [target (aget e "target" "id")]
-    (println target)
-    )
-  )
+    (println target)))
+
+(defn event-is-control?
+  [js-evt]
+  (let [id (keyword (aget js-evt "target" "id"))]
+    (condp = id
+      :controls true
+      :control-wheel true
+      false)))
+
+(defn id-is-control-wheel?
+  [id]
+  (= id :control-wheel))
 
 (defn controls
-  []
-  [:div {:style         {:position   "absolute"
-                         :width      "500px"
-                         :height     "100px"
-                         :background "green"}
-         :on-click      (fn [e] (println "Dude!"))
-         :on-mouse-up   (fn [e])
-         :on-mouse-move (fn [e])}
-   ]
-  )
+  [{:keys [x y expanded?]}]
+  [:div {:id    "controls"
+         :style {:position      "absolute"
+                 :transition    "width 100ms linear, height 100ms linear"
+                 :transform     (str "translate(" x "px," y "px)")
+                 :width         (if expanded? "500px" "45px")
+                 :height        (if expanded? "100px" "45px")
+                 :overflow      "hidden"
+                 :border-radius "5px"
+                 :background    "green"}}
+   ;[:div {:style {:display        "flex"
+   ;               :flex-direction "row"
+   ;               :align-items    "center"}}
+   [:span {:style {:font-size   "40px"
+                   :cursor      "pointer"
+                   :user-select "none"
+                   :margin      "10px"}
+           :id    "control-wheel"}
+    "+️"]
+   [:div {:style {:margin-left "10px"}}
+    [:button "Hi"]]
+   ;]
+   ])

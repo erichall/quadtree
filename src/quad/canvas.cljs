@@ -60,15 +60,19 @@
   (str "_" (.substr (.toString (.random js/Math) 36) 2 9)))
 
 (defn create-canvas
-  [h w]
-  (let [canvas (create-dom-canvas! w h (random-id) js/document.body)]
-    (reset! ctx-atom (.getContext canvas "2d" (clj->js "alpha" false)))
-    ;; TODO is this the only way to not blurr lines...?!?!?
-    (.setTransform @ctx-atom 1, 0, 0, 1, 0.5, 0.5)
+  ([h w] (create-canvas h w "black"))
+  ([h w color]
+   (let [canvas (create-dom-canvas! w h (random-id) js/document.body)]
+     (reset! ctx-atom (.getContext canvas "2d" (clj->js "alpha" false)))
 
-    ;; TODO might not be the best thing to create this here?
-    ;(reset! canvas-data-atom (.getImageData @ctx-atom 0 0 w h))
-    ))
+     (aset canvas "style" "background" color)
+
+     ;; TODO is this the only way to not blurr lines...?!?!?
+     (.setTransform @ctx-atom 1, 0, 0, 1, 0.5, 0.5)
+
+     ;; TODO might not be the best thing to create this here?
+     ;(reset! canvas-data-atom (.getImageData @ctx-atom 0 0 w h))
+     )))
 
 (defn- begin-path
   [ctx]
