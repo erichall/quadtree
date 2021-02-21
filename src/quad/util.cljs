@@ -49,3 +49,16 @@
       (let [new-id (js/setTimeout (fn []
                                     (apply f args)) interval)]
         (reset! id new-id)))))
+
+(defn raf-render
+  [state render-fn]
+  (js/requestAnimationFrame (fn [timestamp] (render-fn state))))
+
+(defn dispatch-worker
+  [data trigger-event]
+  (let [worker (js/Worker. "/js/worker.js")]
+    (.. worker (addEventListener "message" (fn [e]
+                                             (let [{:keys [name data]} (js->clj (aget e "data") :keywordize-keys true)]
+                                               (trigger-event (keyword name) data)
+                                               ))))
+    (.. worker (postMessage (clj->js data)))))

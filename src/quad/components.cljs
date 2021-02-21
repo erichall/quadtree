@@ -141,33 +141,56 @@
     (condp = id
       :controls true
       :control-wheel true
+      :add-cells-btn true
       false)))
 
-(defn id-is-control-wheel?
-  [id]
-  (= id :control-wheel))
+(defn is-control-wheel? [id] (= id :control-wheel))
+(defn is-add-cells-btn? [id] (= id :add-cells-btn))
 
 (defn controls
-  [{:keys [x y expanded?]}]
+  [{:keys [x y expanded? trigger-event cells-input-value]}]
   [:div {:id    "controls"
          :style {:position      "absolute"
                  :transition    "width 100ms linear, height 100ms linear"
                  :transform     (str "translate(" x "px," y "px)")
                  :width         (if expanded? "500px" "45px")
-                 :height        (if expanded? "100px" "45px")
+                 :height        (if expanded? "100px" "37px")
                  :overflow      "hidden"
                  :border-radius "5px"
-                 :background    "green"}}
-   ;[:div {:style {:display        "flex"
-   ;               :flex-direction "row"
-   ;               :align-items    "center"}}
-   [:span {:style {:font-size   "40px"
+                 :background    "rgba(0, 140, 255, 0.5)"}}
+   [:span {:style {;:font-size   "40px"
+                   :opacity     (if expanded? 1 0)
+                   :transition  "opacity 200ms"
+                   :position    "absolute"
                    :cursor      "pointer"
                    :user-select "none"
-                   :margin      "10px"}
+                   :margin-left "5px"}
            :id    "control-wheel"}
-    "+️"]
-   [:div {:style {:margin-left "10px"}}
-    [:button "Hi"]]
-   ;]
-   ])
+    "♛"]
+   [:span {:style {;:font-size   "40px"
+                   :opacity     (if expanded? 0 1)
+                   :transition  "opacity 200ms"
+                   :position    "absolute"
+                   :cursor      "pointer"
+                   :user-select "none"
+                   :margin-left "5px"}
+           :id    "control-wheel"}
+    "♚"]
+   [:div {:id    "controls"
+          :style {:margin-left "50px"
+                  :display     "flex"
+                  :align-items "center"
+                  :height      "100%"}}
+    [:div {:style {:width "50px"}}
+     [:input {:type      "number"
+              :value     cells-input-value
+              :on-change (fn [e]
+                           (trigger-event :add-cells-input-change
+                                          (or (int (aget e "target" "value"))
+                                              cells-input-value)))
+              :id        "add-cells-input"
+              :style     {:width "80px"}}]
+     [:button {:id "add-cells-btn"} "Add cells"]]
+    ]
+   ]
+  )
