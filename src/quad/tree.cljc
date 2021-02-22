@@ -470,6 +470,16 @@
          (query se target-bounds [])
          (query sw target-bounds []))))))
 
+(defn clear-cells
+  [tree]
+  (if (nil? (:nw tree))
+    (dissoc tree :cells)
+    (-> tree
+        (assoc :nw (clear-cells (:nw tree)))
+        (assoc :ne (clear-cells (:ne tree)))
+        (assoc :se (clear-cells (:se tree)))
+        (assoc :sw (clear-cells (:sw tree))))))
+
 (comment
   (let [t {:capacity 4,
            :bounds   {:x 512, :y 512, :width 512, :height 512},

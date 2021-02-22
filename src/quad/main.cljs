@@ -80,18 +80,16 @@
 (defn handle-event!
   [name data]
   (let [{:keys [width height]} @state-atom]
-
-    (println name)
-
     (condp = name
       :print-tree (cljs.pprint/pprint (:tree @state-atom))
       :random-cells (let [cells (qt/random-cells data width height)]
+                      (swap! state-atom update :cells concat cells)
+
                       (console/time-start "insert-random-cells")
                       (->> cells
                            qt/sort-cells-by-z-order
-                           (qt/insert-cells initial-tree)
-                           (swap! state-atom assoc :tree)
-                           (swap! state-atom assoc :cells cells))
+                           (qt/insert-cells (or (:tree @state-atom) initial-tree))
+                           (swap! state-atom assoc :tree))
                       (console/time-end "insert-random-cells")
                       (u/raf-render @state-atom render))
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
@@ -117,6 +115,12 @@
                              :tree new-tree
                              :cells (concat (:cells @state-atom) cells))
                       (u/raf-render render)))
+      :clear-cells (do
+                     (swap! state-atom (fn [state]
+                                         (-> (assoc state :tree (qt/clear-cells (:tree state)))
+                                             (assoc :cells []))))
+                     (c/clear-canvas)
+                     (u/raf-render @state-atom render))
       :add-cells-input-change (-> (swap! state-atom assoc-in [:controls :cells-input-value] data)
                                   (u/raf-render render-divs))
       :cells-in-rect (let [in-rect (:cells-in-rect data)]
@@ -173,8 +177,14 @@
         no-move? (and
                    (= (get-in state [:controls :prev-x]) (get-in state [:controls :x]))
                    (= (get-in state [:controls :prev-y]) (get-in state [:controls :y])))]
-    (println id)
     (cond
+      (and (= type :mouseup)
+           (comp/is-clear-cells-btn? id)
+           no-move?)
+      (do
+        (handle-event! :clear-cells nil)
+        (on-control-up! @state-atom))
+
       (and (= type :mouseup)
            (comp/is-control-wheel? id)
            no-move?)
@@ -233,7 +243,7 @@
   (c/create-canvas (:width @state-atom) (:height @state-atom))
   (c/resize-canvas)
 
-  (handle-event! :random-cells 1000)
+  (handle-event! :random-cells 10)
 
   (render @state-atom)
   (render-divs @state-atom)

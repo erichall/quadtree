@@ -126,15 +126,16 @@
   []
   (let [canvas-data @canvas-data-atom]
     (doseq [i (range (.-length (.-data canvas-data)))]
-      (aset canvas-data "data" i 255)
-      )
-    )
-  )
+      (aset canvas-data "data" i 255))))
 
 (defn put-img-data
   []
   (js/console.log @canvas-data-atom)
   (.putImageData @ctx-atom @canvas-data-atom 0 0))
+
+(defn clear-canvas
+  []
+  (.clearRect @ctx-atom 0 0 (width) (height)))
 
 (defn fill
   []
