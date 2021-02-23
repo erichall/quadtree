@@ -15,7 +15,7 @@
 (tufte/add-basic-println-handler!
   {:format-pstats-opts {:columns [:n-calls :p50 :mean :clock :total]}})
 
-(declare render-cells render-divs)
+(declare render-cells render-divs handle-event!)
 
 ;(enable-console-print!)
 
@@ -27,11 +27,14 @@
                       :height             1024
                       :cell-width         3
                       :cell-height        3
-                      :cell-color         "pink"
-                      :cell-in-rect-color "red"
-                      :bounds-color       "yellow"
+                      :inserting?         false
+                      :cell-color         "#ff9ef1"
+                      :cell-in-rect-color "#fc030f"
+                      :bounds-color       "#fcba03"
                       :is-drawing-points  false
-                      ;; TODO
+                      :performance        {:random-cells []
+                                           :timers       []
+                                           }
                       :target-bounds      {:x      300
                                            :y      200
                                            :width  200
@@ -54,8 +57,25 @@
                                             :y      (/ (:height @state-atom) 2)
                                             :width  (/ (:width @state-atom) 2)
                                             :height (/ (:height @state-atom) 2)}}))
+(defn render-divs
+  "Render the resizable rect and the control panel.
+  this is separate from the canvas rendering functions, giiish it's a mes right"
+  [{:keys [width height controls cell-width cell-height cell-color cell-in-rect-color bounds-color performance]}]
+  (rd/render
+    [:<>
+     [comp/resizable-rect {:movable-area-width  width
+                           :movable-area-height height}]
+     [comp/controls (merge controls {:trigger-event      handle-event!
+                                     :cell-color         cell-color
+                                     :cell-width         cell-width
+                                     :cell-height        cell-height
+                                     :cell-in-rect-color cell-in-rect-color
+                                     :bounds-color       bounds-color})]
+     [comp/performance performance]]
+    (. js/document (getElementById "app"))))
+
 (defn render
-  [{:keys [cells tree cells-in-rect cell-height cell-width cell-in-rect-color cell-color bounds-color]}]
+  [{:keys [cells tree cells-in-rect cell-height cell-width cell-in-rect-color cell-color bounds-color performance]}]
   (doseq [{:keys [x y]} cells]
     (c/fill-rect x y cell-width cell-height cell-color))
 
@@ -66,16 +86,36 @@
 
   (doseq [{:keys [x y width height] :as b} (qt/tree->bounds tree)]
     (c/rect (- x width) (- y width) (* 2 width) (* 2 width) {:batch? true}))
-  (c/stroke))
+  (c/stroke)
+
+  (let [{:keys [render-timers remaining-timers]} (reduce (fn [acc {:keys [end-on?] :as t}]
+                                                           (if (= end-on? :render)
+                                                             (update acc :render-timers conj t)
+                                                             (update acc :remaining-timers conj t)
+                                                             )) {:render-timers    []
+                                                                 :remaining-timers []} (:timers performance))]
+    (when-not (empty? render-timers)
+      (let [render-end (js/Date.now)
+            ended-timers (map (fn [timer] (assoc timer :render-end render-end)) render-timers)]
+        (-> (swap! state-atom (fn [state]
+                                (->
+                                  (reduce (fn [state t]
+                                            (update-in state [:performance (:category t)] conj t)) state ended-timers)
+                                  (assoc-in [:performance :timers] remaining-timers))))
+            render-divs
+            )
+        ))
+    )
+  )
 
 (defn render-cells
-  [{:keys [tree cells target-bounds cell-in-rect-color cell-color]}]
+  [{:keys [tree cells target-bounds cell-in-rect-color cell-color cell-height cell-width]}]
   (let [cells-in-bounds (qt/query tree target-bounds)]
     (doseq [{:keys [x y]} cells]
-      (c/fill-rect x y 3 3 cell-color))
+      (c/fill-rect x y cell-width cell-height cell-color))
 
     (doseq [{:keys [x y]} cells-in-bounds]
-      (c/fill-rect x y 3 3 cell-in-rect-color))))
+      (c/fill-rect x y cell-width cell-height cell-in-rect-color))))
 
 (defn handle-event!
   [name data]
@@ -85,12 +125,27 @@
       :random-cells (let [cells (qt/random-cells data width height)]
                       (swap! state-atom update :cells concat cells)
 
-                      (console/time-start "insert-random-cells")
-                      (->> cells
-                           qt/sort-cells-by-z-order
-                           (qt/insert-cells (or (:tree @state-atom) initial-tree))
-                           (swap! state-atom assoc :tree))
-                      (console/time-end "insert-random-cells")
+                      (let [timer-id (keyword (u/random-id))]
+                        (swap! state-atom update-in [:performance :timers] conj {:start    (js/Date.now)
+                                                                                 :category :random-cells
+                                                                                 :end-on?  :render
+                                                                                 :id       timer-id
+                                                                                 :n-cells  data})
+
+                        (console/time-start "insert-random-cells")
+                        (->> cells
+                             qt/sort-cells-by-z-order
+                             (qt/insert-cells (or (:tree @state-atom) initial-tree))
+                             (swap! state-atom assoc :tree))
+                        (console/time-end "insert-random-cells")
+
+                        (swap! state-atom assoc :inserting? false)
+
+                        (->> (map (fn [timer]
+                                    (if (= (:id timer) timer-id)
+                                      (assoc timer :random-cells-end (js/Date.now))
+                                      timer)) (get-in @state-atom [:performance :timers]))
+                             (swap! state-atom assoc-in [:performance :timers])))
                       (u/raf-render @state-atom render))
       :rect-drag (-> (swap! state-atom assoc :resizable-rect-pos data)
                      (u/raf-render render-cells))
@@ -125,18 +180,14 @@
                                   (u/raf-render render-divs))
       :cells-in-rect (let [in-rect (:cells-in-rect data)]
                        (-> (swap! state-atom assoc :cells-in-rect in-rect)
-                           (u/raf-render render))))))
+                           (u/raf-render render)))
+      :bounds-color (-> (swap! state-atom assoc :bounds-color data) render-divs)
+      :cell-color (-> (swap! state-atom assoc :cell-color data) render-divs)
+      :cell-in-rect-color (-> (swap! state-atom assoc :cell-in-rect-color data) render-divs)
+      :cell-width (-> (swap! state-atom assoc :cell-width data) render-divs)
+      :cell-height (-> (swap! state-atom assoc :cell-height data) render-divs)
+      )))
 
-(defn render-divs
-  "Render the resizable rect and the control panel.
-  this is separate from the canvas rendering functions, giiish it's a mes right"
-  [{:keys [width height controls]}]
-  (rd/render
-    [:<>
-     [comp/resizable-rect {:movable-area-width  width
-                           :movable-area-height height}]
-     [comp/controls (merge controls {:trigger-event handle-event!})]]
-    (. js/document (getElementById "app"))))
 
 
 (defn on-rect-move
@@ -245,7 +296,6 @@
 
   (handle-event! :random-cells 10)
 
-  (render @state-atom)
   (render-divs @state-atom)
 
   (println "Total memory: " (Math/round (* (.-usedJSHeapSize js/performance.memory) 0.000001)) " mb")

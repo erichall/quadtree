@@ -1,6 +1,8 @@
 /* some style */
 body {
     background: black;
+    padding: 0px;
+    max-width: inherit;
 }
 
 /* Specilly used for Firefox */
@@ -14,4 +16,9 @@ input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+
+#performance-container::-webkit-scrollbar {
+    width: 0px;
+}
+
 

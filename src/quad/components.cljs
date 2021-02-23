@@ -150,13 +150,17 @@
 (defn is-clear-cells-btn? [id] (= id :clear-cells-btn))
 
 (defn controls
-  [{:keys [x y expanded? trigger-event cells-input-value]}]
+  [{:keys [x y expanded? trigger-event cells-input-value cell-width cell-height cell-color cell-in-rect-color bounds-color]}]
   [:div {:id    "controls"
          :style {:position      "absolute"
-                 :transition    "width 100ms linear, height 100ms linear"
+                 :transition    "max-width 100ms linear, max-height 100ms linear"
                  :transform     (str "translate(" x "px," y "px)")
-                 :width         (if expanded? "500px" "45px")
-                 :height        (if expanded? "100px" "37px")
+                 ;:width         (if expanded? "500px" "45px")
+                 :width         "auto"
+                 :height        "auto"
+                 :max-height    (if expanded? "1000px" "45px")
+                 :max-width     (if expanded? "1000px" "37px")
+                 ;:height        (if expanded? "500px" "37px")
                  :overflow      "hidden"
                  :border-radius "5px"
                  :background    "rgba(0, 140, 255, 0.5)"}}
@@ -177,31 +181,149 @@
            :id    "control-wheel"}
     "♚"]
    [:div {:id    "controls"
-          :style {:margin-left    "50px"
-                  :display        "flex"
-                  :flex-direction "row"
-                  :align-items    "center"
-                  :height         "100%"}}
-    [:div
-     [:input {:type      "number"
-              :value     cells-input-value
-              :on-change (fn [e]
-                           (trigger-event :add-cells-input-change
-                                          (or (int (aget e "target" "value"))
-                                              cells-input-value)))
-              :id        "add-cells-input"
-              :style     {:width "80px"}}]
-     [:button {:id "add-cells-btn"} "Add cells"]]
+          :style {:margin-left           "50px"
+                  :display               "grid"
+                  :grid-template-columns "repeat (2, 1fr)"
+                  :grid-template-rows    "repeat (5, 1fr)"
+                  :grid-column-gap       "10px"
+                  :grid-row-gap          "10px"
+                  :justify-items         "right"
+                  :align-items           "center"
+                  :padding               "10px"
+                  :height                "100%"}}
+    [:input {:type      "number"
+             :value     cells-input-value
+             :on-change (fn [e]
+                          (trigger-event :add-cells-input-change
+                                         (or (int (aget e "target" "value"))
+                                             cells-input-value)))
+             :id        "add-cells-input"
+             :style     {:width        "80px"
+                         :grid-area    "1 / 1 / 2 / 2"
+                         :justify-self "left"
+                         :margin-top   "5px"
+                         :height       "75%"
+                         :align-self   "baseline"}}]
+    [:button {:id    "add-cells-btn"
+              :style {:grid-area "1 / 2 / 2 / 3"}
+              } "Add cells"]
+
     [:button {:id    "clear-cells-btn"
-              :style {:flex 1}} "Clear cells"]
-    [:div {:id    "grid-color-input"
-           :style {:flex           1
-                   :display        "flex"
-                   :flex-direction "column"}}
+              :style {:grid-area "2 / 2 / 3 / 2"}} "Clear cells"]
+
+    [:label {:style {:grid-area    "3 / 1 / 4 / 2"
+                     :justify-self "left"}} "Grid color"]
+    [:div {:style {:grid-area "3 / 2 / 4 / 3"
+                   :height    "100%"
+                   :width     "100%"}}
      [:input {:type      "color"
-              :on-change (fn [js-evt] (println (aget js-evt "target" "value")))}]
-     [:label "Grid color"]
-     ]
-    ]
-   ]
+              :style     {:grid-area "3 / 2 / 4 / 3"
+                          :height    "100%"
+                          :width     "100%"}
+              :value     bounds-color
+              :on-change (fn [js-evt] (trigger-event :bounds-color (aget js-evt "target" "value")))}]]
+
+    [:label {:style {:grid-area    "4 / 1 / 5 / 2"
+                     :justify-self "left"}} "Cell color"]
+    [:div {:style {:grid-area "4 / 2 / 5 / 3"
+                   :height    "100%"
+                   :width     "100%"}}
+     [:input {:type      "color"
+              :style     {:grid-area "4 / 2 / 5 / 3"
+                          :height    "100%"
+                          :width     "100%"}
+              :value     cell-color
+              :on-change (fn [js-evt] (trigger-event :cell-color (aget js-evt "target" "value")))}]]
+
+    [:label {:style {:grid-area    "5 / 1 / 5 / 2"
+                     :justify-self "left"}} "Rect color"]
+    [:div {:style {:grid-area "5 / 2 / 5 / 3"
+                   :height    "100%"
+                   :width     "100%"}}
+     [:input {:type      "color"
+              :style     {:grid-area "5 / 2 / 5 / 3"
+                          :height    "100%"
+                          :width     "100%"}
+              :value     cell-in-rect-color
+              :on-change (fn [js-evt] (trigger-event :cell-in-rect-color
+                                                     (aget js-evt "target" "value")))}]]
+
+
+    [:label {:style {:grid-area    "6 / 1 / 6 / 2"
+                     :justify-self "left"}} "Cell width"]
+    [:input {:type      "number"
+             :value     cell-width
+             :on-change (fn [e]
+                          (trigger-event :cell-width
+                                         (or (int (aget e "target" "value"))
+                                             cell-width)))
+             :id        "cell-width"
+             :style     {:width        "100px"
+                         :grid-area    "6 / 2 / 6 / 2"
+                         :justify-self "left"
+                         :margin-top   "5px"
+                         :height       "75%"
+                         :align-self   "baseline"}}]
+
+    [:label {:style {:grid-area    "7 / 1 / 7 / 2"
+                     :justify-self "left"}} "Cell height"]
+    [:input {:type      "number"
+             :value     cell-height
+             :on-change (fn [e]
+                          (trigger-event :cell-height
+                                         (or (int (aget e "target" "value"))
+                                             cell-height)))
+             :id        "cell-height"
+             :style     {:width        "100px"
+                         :grid-area    "7 / 2 / 7 / 2"
+                         :justify-self "left"
+                         :margin-top   "5px"
+                         :height       "75%"
+                         :align-self   "baseline"}}]]])
+
+(defn performance
+  []
+  (let [local-state-atom (r/atom {:expanded? false})]
+    (fn
+      [{:keys [random-cells] :as t}]
+      (let [row-height 30
+            {:keys [expanded?]} @local-state-atom]
+        [:div {:id    "performance-container"
+               :style {:background "rgba(63, 199, 255, 0.45)"
+                       :top        "20px"
+                       :right      "20px"
+                       :position   "absolute"
+                       :transition "height 50ms"
+                       :padding    "15px"
+                       :width      "auto"
+                       :min-width  "250px"
+                       :height     (if expanded?
+                                     (min (+ 40 (* (count random-cells) (+ 10 row-height)))
+                                          (+ 40 (* 10 (+ 10 row-height))))
+                                     "50px")
+                       :overflow-y "auto"}}
+         [:div {:style    {:width           "100%"
+                           :height          "20px"
+                           :display         "flex"
+                           :align-items     "center"
+                           :justify-content "center"
+                           :cursor          "pointer"
+                           :margin-bottom   "20px"}
+                :on-click (fn [] (swap! local-state-atom assoc :expanded? (not expanded?)))}
+          [:span (if expanded? "▲" "▼")]]
+         (when expanded?
+           (map (fn [{:keys [category start n-cells render-end random-cells-end id]}]
+                  [:div {:style {:height      row-height
+                                 :margin-top  "10px"
+                                 :white-space "nowrap"}
+                         :key   id}
+                   [:span {:style {:margin-right "15px"}}
+                    (name category)]
+                   [:span {:style {:margin-right "15px"}}
+                    n-cells " Cells"]
+                   [:span
+                    (- random-cells-end start) " ms"]
+                   ]
+                  ) (reverse random-cells)))]
+        )))
   )

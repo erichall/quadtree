@@ -1,4 +1,5 @@
-(ns quad.canvas)
+(ns quad.canvas
+  (:require [quad.util :refer [random-id]]))
 
 (defonce ctx-atom (atom nil))
 (defonce canvas-data-atom (atom nil))
@@ -24,7 +25,6 @@
         x (- (.-clientX js-event) (.-left rect))
         y (- (.-clientY js-event) (.-top rect))]
     {:x x :y y}))
-
 
 (defn resize-canvas
   []
@@ -55,9 +55,6 @@
           (.appendChild target canvas))
         canvas))))
 
-(defn- random-id
-  []
-  (str "_" (.substr (.toString (.random js/Math) 36) 2 9)))
 
 (defn create-canvas
   ([h w] (create-canvas h w "black"))

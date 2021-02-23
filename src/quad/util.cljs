@@ -62,3 +62,7 @@
                                                (trigger-event (keyword name) data)
                                                ))))
     (.. worker (postMessage (clj->js data)))))
+
+(defn random-id
+  []
+  (str "_" (.substr (.toString (.random js/Math) 36) 2 9)))

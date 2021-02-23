@@ -185,11 +185,11 @@
                                     (in-bounds? nw-b cell next-depth) (update split-cells :nw conj cell)
                                     (in-bounds? ne-b cell next-depth) (update split-cells :ne conj cell)
                                     (in-bounds? se-b cell next-depth) (update split-cells :se conj cell)
-                                    (in-bounds? sw-b cell next-depth) (update split-cells :sw conj cell)
-                                    )) {:nw []
-                                        :ne []
-                                        :se []
-                                        :sw []} cells)]
+                                    (in-bounds? sw-b cell next-depth) (update split-cells :sw conj cell)))
+                                {:nw []
+                                 :ne []
+                                 :se []
+                                 :sw []} cells)]
         (-> tree
             (dissoc :cells)
             (assoc :nw (-> (make-tree {:bounds (nw-split (:bounds tree) w) :depth next-depth})
