@@ -285,11 +285,12 @@
   []
   (let [local-state-atom (r/atom {:expanded? false})]
     (fn
-      [{:keys [random-cells] :as t}]
+      [{:keys [x y random-cells] :as t}]
       (let [row-height 30
             {:keys [expanded?]} @local-state-atom]
         [:div {:id    "performance-container"
                :style {:background "rgba(63, 199, 255, 0.45)"
+                       :transform  (str "translate(" x "px," y "px)")
                        :top        "20px"
                        :right      "20px"
                        :position   "absolute"

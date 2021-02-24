@@ -23,7 +23,7 @@
 (defonce state-atom (r/atom nil))
 (when (nil? @state-atom)
   (reset! state-atom {:cells              []
-                      :width              1024              ;; TODO hacked ugly inside tree.clj
+                      :width              1024
                       :height             1024
                       :cell-width         3
                       :cell-height        3
@@ -34,6 +34,10 @@
                       :is-drawing-points  false
                       :performance        {:random-cells []
                                            :timers       []
+                                           :x            0
+                                           :y            0
+                                           :x-start      0
+                                           :y-start      0
                                            }
                       :target-bounds      {:x      300
                                            :y      200
@@ -84,8 +88,8 @@
 
   (c/stroke-style bounds-color)
 
-  (doseq [{:keys [x y width height] :as b} (qt/tree->bounds tree)]
-    (c/rect (- x width) (- y width) (* 2 width) (* 2 width) {:batch? true}))
+  (doseq [{:keys [x y width height]} (qt/tree->bounds tree)]
+    (c/rect (- x width) (- y width) (* 2 width) (* 2 height) {:batch? true}))
   (c/stroke)
 
   (let [{:keys [render-timers remaining-timers]} (reduce (fn [acc {:keys [end-on?] :as t}]
@@ -103,10 +107,7 @@
                                             (update-in state [:performance (:category t)] conj t)) state ended-timers)
                                   (assoc-in [:performance :timers] remaining-timers))))
             render-divs
-            )
-        ))
-    )
-  )
+            )))))
 
 (defn render-cells
   [{:keys [tree cells target-bounds cell-in-rect-color cell-color cell-height cell-width]}]
