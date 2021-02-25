@@ -266,6 +266,10 @@
   (let [id (keyword (aget js-evt "target" "id"))
         type (keyword (.-type js-evt))]
     (cond
+
+      (or (= id :performance-container))
+      nil                                                   ;; TODO
+
       (or (comp/event-is-control? js-evt)
           (get-in @state-atom [:controls :moving?]))
       (control-mouse-handler @state-atom js-evt id type)

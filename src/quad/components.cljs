@@ -324,7 +324,4 @@
                     n-cells " Cells"]
                    [:span
                     (- random-cells-end start) " ms"]
-                   ]
-                  ) (reverse random-cells)))]
-        )))
-  )
+                   ]) (reverse random-cells)))]))))
