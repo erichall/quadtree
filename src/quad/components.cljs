@@ -291,8 +291,6 @@
         [:div {:id    "performance-container"
                :style {:background "rgba(63, 199, 255, 0.45)"
                        :transform  (str "translate(" x "px," y "px)")
-                       :top        "20px"
-                       :right      "20px"
                        :position   "absolute"
                        :transition "height 50ms"
                        :padding    "15px"

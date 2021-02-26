@@ -19,7 +19,6 @@
 
 ;(enable-console-print!)
 
-(defonce rect-component (atom nil))
 (defonce state-atom (r/atom nil))
 (when (nil? @state-atom)
   (reset! state-atom {:cells              []
@@ -34,11 +33,11 @@
                       :is-drawing-points  false
                       :performance        {:random-cells []
                                            :timers       []
-                                           :x            0
-                                           :y            0
-                                           :x-start      0
-                                           :y-start      0
-                                           }
+                                           :x            500
+                                           :y            200
+                                           :x-start      500
+                                           :y-start      200
+                                           :moving?      false}
                       :target-bounds      {:x      300
                                            :y      200
                                            :width  200
@@ -261,14 +260,49 @@
       (= type :mousedown)
       (on-control-down! js-evt))))
 
+(defn on-performance-move!
+  [js-evt]
+  (swap! state-atom (fn [state]
+                      (->
+                        (assoc-in state [:performance :x] (- (u/client-x js-evt) (get-in state [:performance :x-start])))
+                        (assoc-in [:performance :y] (- (u/client-y js-evt) (get-in state [:performance :y-start])))))))
+
+(defn on-performance-up!
+  [state]
+  (swap! state-atom assoc-in [:performance :moving?] false))
+
+(defn on-performance-down!
+  [js-evt]
+  (swap! state-atom (fn [state]
+                      (-> (assoc-in state [:performance :moving?] true)
+                          (assoc-in [:performance :x-start] (- (u/client-x js-evt) (get-in state [:performance :x])))
+                          (assoc-in [:performance :y-start] (- (u/client-y js-evt) (get-in state [:performance :y])))))))
+
+(defn performance-container-mouse-handler
+  [state js-evt id type]
+  (cond
+    (and (get-in state [:performance :moving?])
+         (= type :mousemove))
+    (-> (on-performance-move! js-evt)
+        render-divs)
+
+    (= type :mouseup)
+    (on-performance-up! @state-atom)
+
+    (= type :mousedown)
+    (on-performance-down! js-evt)
+
+    )
+  )
+
 (defn mouse-handler
   [js-evt]
   (let [id (keyword (aget js-evt "target" "id"))
         type (keyword (.-type js-evt))]
     (cond
-
-      (or (= id :performance-container))
-      nil                                                   ;; TODO
+      (or (= id :performance-container)
+          (get-in @state-atom [:performance :moving?]))
+      (performance-container-mouse-handler @state-atom js-evt id type)
 
       (or (comp/event-is-control? js-evt)
           (get-in @state-atom [:controls :moving?]))
