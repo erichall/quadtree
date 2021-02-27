@@ -71,6 +71,7 @@
          (<= (:y cell) (+ y height)))))
 (def memo-in-bounds? (memoize in-bounds?))
 
+
 (defn in-target-bounds?
   "Check if a given cell is within a boundary."
   [{:keys [x y width height]} {cx :x cy :y}]
@@ -208,17 +209,6 @@
     :else
     tree))
 
-(comment
-  (let [tree (make-tree {:capacity 4
-                         :bounds   {:x      200
-                                    :y      200
-                                    :width  200
-                                    :height 200}})]
-    (insert tree {:x 0 :y 0})
-    )
-  )
-
-
 (defn print-tree
   [{:keys [cells bounds nw ne se sw depth name] :as tree}]
   (let [spaces (reduce (fn [s _] (str s " ")) "" (range (or depth 0)))]
@@ -353,13 +343,12 @@
                                              :y      200
                                              :width  200
                                              :height 200}})]
-             ;; TODO FIX global bounds....
-             ;(is (= (-> (insert tree {:x 0 :y 0})
-             ;           tree->bounds)
-             ;       [{:height 200 :width 200 :x 200 :y 200}]))
+             (is (= (-> (insert tree {:x 0 :y 0})
+                        tree->bounds)
+                    [{:height 200 :width 200 :x 200 :y 200}]))
              ))}
   ([tree] (tree->bounds tree []))
-  ([{:keys [bounds nw ne se sw depth]} bounds-acc]
+  ([{:keys [bounds nw ne se sw]} bounds-acc]
    (if (nil? nw)
      (conj bounds-acc bounds)
      (concat
@@ -368,6 +357,17 @@
        (tree->bounds ne bounds-acc)
        (tree->bounds se bounds-acc)
        (tree->bounds sw bounds-acc)))))
+
+(defn- cells-in-target-bounds?
+  [cells target-bounds]
+  (filter (fn [c] (in-target-bounds? target-bounds c)) cells))
+
+(defn- cells-in-target-bounds-visited?
+  [cells target-bounds]
+  (map (fn [c]
+         (if (in-target-bounds? target-bounds c)
+           c
+           (assoc-in c [:data :visited?] true))) cells))
 
 (defn query
   {:test (fn []
@@ -440,23 +440,28 @@
                               :name     "start"}]
                (is (= (query test-tree {:x 295, :y 461, :height 200, :width 200})
                       [{:x 422, :y 557}])))))}
-  ([tree target-bounds] (query tree target-bounds []))
-  ([{:keys [nw ne se sw bounds cells]} target-bounds found]
+  ([tree target-bounds] (query tree target-bounds [] nil))
+  ([tree target-bounds options] (query tree target-bounds [] options))
+  ([{:keys [nw ne se sw bounds cells]} target-bounds found options]
    (cond
      (not (intersects? target-bounds bounds))
      found
 
      (nil? nw)
-     (concat found (filter (fn [c] (in-target-bounds? target-bounds c)) cells))
+     (concat found
+             (if (:color-visited? options)
+               (cells-in-target-bounds-visited? cells target-bounds)
+               (cells-in-target-bounds? cells target-bounds)))
 
      :else
-     (let [in-bounds (filter (fn [c] (in-target-bounds? target-bounds c)) cells)]
-       (concat
-         in-bounds
-         (query nw target-bounds [])
-         (query ne target-bounds [])
-         (query se target-bounds [])
-         (query sw target-bounds []))))))
+     (concat
+       (if (some? (:color-visited? options))
+         (cells-in-target-bounds-visited? cells target-bounds)
+         (cells-in-target-bounds? cells target-bounds))
+       (query nw target-bounds [] options)
+       (query ne target-bounds [] options)
+       (query se target-bounds [] options)
+       (query sw target-bounds [] options)))))
 
 (defn clear-cells
   [tree]
@@ -468,54 +473,38 @@
         (assoc :se (clear-cells (:se tree)))
         (assoc :sw (clear-cells (:sw tree))))))
 
-(comment
-  (let [t {:capacity 4,
-           :bounds   {:x 512, :y 512, :width 512, :height 512},
-           :cells    [],
-           :nw       {:capacity 4,
-                      :bounds   {:x 256, :y 256, :height 256, :width 256},
-                      :cells    [],
-                      :nw       nil,
-                      :ne       nil,
-                      :sw       nil,
-                      :se       nil,
-                      :name     "nw"},
-           :ne       {:capacity 4,
-                      :bounds   {:x 768, :y 256, :height 256, :width 256},
-                      :cells    [{:x 665, :y 294}],
-                      :nw       nil,
-                      :ne       nil,
-                      :sw       nil,
-                      :se       nil,
-                      :name     "ne"},
-           :sw       {:capacity 4,
-                      :bounds   {:x 256, :y 768, :height 256, :width 256},
-                      :cells    [{:x 422, :y 557}],
-                      :nw       nil,
-                      :ne       nil,
-                      :sw       nil,
-                      :se       nil,
-                      :name     "sw"},
-           :se       {:capacity 4,
-                      :bounds   {:x 768, :y 768, :height 256, :width 256},
-                      :cells
-                                [{:x 672, :y 1013}],
-                      :nw       nil,
-                      :ne       nil,
-                      :sw       nil,
-                      :se       nil,
-                      :name     "se"},
-           :name     "start"}]
-    (query t {:x 0, :y 0, :height 200, :width 200})))
-
 (defn concat-cells
   [t1 t2]
   (let [t1-cells (:cells t1)
         t2-cells (:cells t2)]
-    (println "t1-cells " t1-cells "t2-cells " t2-cells)
     (concat (or t1-cells []) (or t2-cells []))))
 
+(defn tree-depth
+  ([tree] (tree-depth tree 0))
+  ([tree depth]
+   (if (nil? tree)
+     (dec depth)
+     (let [nw-depth (tree-depth (:nw tree) (inc depth))
+           ne-depth (tree-depth (:ne tree) (inc depth))
+           se-depth (tree-depth (:se tree) (inc depth))
+           sw-depth (tree-depth (:sw tree) (inc depth))]
+       (max nw-depth ne-depth se-depth sw-depth)))))
+
 (comment
+
+  (-> (make-tree {:capacity 4
+                  :bounds   {:x      200
+                             :y      200
+                             :width  200
+                             :height 200}})
+      (insert {:x 0 :y 0})
+      (insert {:x 1 :y 0})
+      (insert {:x 2 :y 0})
+      (insert {:x 3 :y 0})
+      (insert {:x 4 :y 0})
+      ;tree-depth
+      print-tree
+      )
 
   (sort-by :x [{:x 1 :y 1} {:x 0 :y 0}])
 

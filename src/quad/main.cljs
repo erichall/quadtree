@@ -24,8 +24,8 @@
   (reset! state-atom {:cells              []
                       :width              1024
                       :height             1024
-                      :cell-width         3
-                      :cell-height        3
+                      :cell-width         10
+                      :cell-height        10
                       :inserting?         false
                       :cell-color         "#ff9ef1"
                       :cell-in-rect-color "#fc030f"
@@ -33,15 +33,15 @@
                       :is-drawing-points  false
                       :performance        {:random-cells []
                                            :timers       []
-                                           :x            500
+                                           :x            1024
                                            :y            200
-                                           :x-start      500
+                                           :x-start      1024
                                            :y-start      200
                                            :moving?      false}
-                      :target-bounds      {:x      300
-                                           :y      200
-                                           :width  200
-                                           :height 200}
+                      :target-bounds      (u/center-bounds {:x      300
+                                                            :y      200
+                                                            :width  200
+                                                            :height 200})
                       :tree               nil
                       :controls           {:x                 0
                                            :y                 0
@@ -49,21 +49,25 @@
                                            :prev-y            0
                                            :x-start           0
                                            :y-start           0
-                                           :expanded?         true
+                                           :expanded?         false
                                            :moving?           false
-                                           :cells-input-value 20
-                                           }}))
+                                           :color-visited?    false
+                                           :cells-input-value 10}
+                      :tooltip            {:x            0
+                                           :y            0
+                                           :should-show? false}
+                      }))
 
 (def initial-tree (qt/make-tree {:capacity 4
                                  :name     "start"
                                  :bounds   {:x      (/ (:width @state-atom) 2)
                                             :y      (/ (:height @state-atom) 2)
-                                            :width  (/ (:width @state-atom) 2)
-                                            :height (/ (:height @state-atom) 2)}}))
+                                            :width  (dec (/ (:width @state-atom) 2))
+                                            :height (dec (/ (:height @state-atom) 2))}}))
 (defn render-divs
   "Render the resizable rect and the control panel.
   this is separate from the canvas rendering functions, giiish it's a mes right"
-  [{:keys [width height controls cell-width cell-height cell-color cell-in-rect-color bounds-color performance]}]
+  [{:keys [tooltip width height controls cell-width cell-height cell-color cell-in-rect-color bounds-color performance]}]
   (rd/render
     [:<>
      [comp/resizable-rect {:movable-area-width  width
@@ -74,16 +78,33 @@
                                      :cell-height        cell-height
                                      :cell-in-rect-color cell-in-rect-color
                                      :bounds-color       bounds-color})]
-     [comp/performance performance]]
-    (. js/document (getElementById "app"))))
+     [comp/performance performance]
+
+     [comp/tooltip tooltip]
+     ]
+    (. js/document (getElementById "app")))
+
+  (swap! state-atom assoc-in [:tooltip :should-show?] false)
+  )
+
+(defn render-cells
+  [{:keys [tree cells target-bounds cell-in-rect-color cell-color cell-height cell-width controls]}]
+
+  (let [cells-in-bounds (qt/query tree target-bounds {:color-visited? (:color-visited? controls)})]
+
+    (doseq [{:keys [x y]} cells]
+      (c/fill-rect x y cell-width cell-height cell-color))
+
+    (doseq [{:keys [x y data]} cells-in-bounds]
+      (c/fill-rect x y cell-width cell-height (if (:visited? data)
+                                                "#00ff00"
+                                                cell-in-rect-color)))))
+
 
 (defn render
-  [{:keys [cells tree cells-in-rect cell-height cell-width cell-in-rect-color cell-color bounds-color performance]}]
-  (doseq [{:keys [x y]} cells]
-    (c/fill-rect x y cell-width cell-height cell-color))
+  [{:keys [tree bounds-color performance] :as state}]
 
-  (doseq [{:keys [x y]} cells-in-rect]
-    (c/fill-rect x y cell-width cell-height cell-in-rect-color))
+  (render-cells state)
 
   (c/stroke-style bounds-color)
 
@@ -108,14 +129,6 @@
             render-divs
             )))))
 
-(defn render-cells
-  [{:keys [tree cells target-bounds cell-in-rect-color cell-color cell-height cell-width]}]
-  (let [cells-in-bounds (qt/query tree target-bounds)]
-    (doseq [{:keys [x y]} cells]
-      (c/fill-rect x y cell-width cell-height cell-color))
-
-    (doseq [{:keys [x y]} cells-in-bounds]
-      (c/fill-rect x y cell-width cell-height cell-in-rect-color))))
 
 (defn handle-event!
   [name data]
@@ -186,16 +199,13 @@
       :cell-in-rect-color (-> (swap! state-atom assoc :cell-in-rect-color data) render-divs)
       :cell-width (-> (swap! state-atom assoc :cell-width data) render-divs)
       :cell-height (-> (swap! state-atom assoc :cell-height data) render-divs)
+      :color-visited-changed (-> (swap! state-atom assoc-in [:controls :color-visited?] data)
+                                 render-divs)
       )))
 
-
-
 (defn on-rect-move
-  [{:keys [x y width height] :as bounds}]
-  (-> (swap! state-atom assoc :target-bounds {:x      (+ x (/ width 2))
-                                              :y      (+ y (/ height 2))
-                                              :width  (/ width 2)
-                                              :height (/ height 2)})
+  [bounds]
+  (-> (swap! state-atom assoc :target-bounds (u/center-bounds bounds))
       (u/raf-render render-cells)))
 
 (defn on-rect-resize
@@ -229,6 +239,8 @@
                    (= (get-in state [:controls :prev-x]) (get-in state [:controls :x]))
                    (= (get-in state [:controls :prev-y]) (get-in state [:controls :y])))]
     (cond
+
+
       (and (= type :mouseup)
            (comp/is-clear-cells-btn? id)
            no-move?)
@@ -295,6 +307,17 @@
     )
   )
 
+(defn cells-on-coordinate
+  [state x y]
+  (let [cord {:x x :y y}
+        cells (qt/tree->cells (:tree state))]
+    (filter (fn [{:keys [x y]}] (qt/in-bounds? (u/center-bounds {:x      x
+                                                                 :y      y
+                                                                 :width  (:cell-width state)
+                                                                 :height (:cell-height state)}) cord)) cells)
+    )
+  )
+
 (defn mouse-handler
   [js-evt]
   (let [id (keyword (aget js-evt "target" "id"))
@@ -309,9 +332,22 @@
       (control-mouse-handler @state-atom js-evt id type)
 
       (and (= id :overlay)
+           (= type :mouseup))
+      (let [x (u/client-x js-evt)
+            y (u/client-y js-evt)]
+        ;(println (cells-on-coordinate @state-atom x y))
+        (-> (swap! state-atom (fn [state]
+                                (-> state
+                                    (assoc-in [:tooltip :x] x)
+                                    (assoc-in [:tooltip :y] y)
+                                    (assoc-in [:tooltip :should-show?] true))))
+            render-divs
+            )
+        )
+
+      (and (= id :overlay)
            (not (comp/is-resizing-rect?))
            (not (comp/is-moving-rect?))
-
            (= type :mousemove)
            (u/mouse-down? js-evt))
       (handle-event! :mouse-down js-evt)
@@ -333,7 +369,7 @@
   (c/create-canvas (:width @state-atom) (:height @state-atom))
   (c/resize-canvas)
 
-  (handle-event! :random-cells 10)
+  (handle-event! :random-cells (get-in @state-atom [:controls :cells-input-value]))
 
   (render-divs @state-atom)
 
@@ -369,8 +405,6 @@
   (time (qt/random-cells 10000 1024 1024))
 
   (qt/insert-cells initial-tree (qt/make-cells 10))
-
-
 
   (println (qt/in-tree? (:tree @state-atom) {:x 901, :y 95}))
   )

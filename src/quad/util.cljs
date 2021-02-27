@@ -66,3 +66,10 @@
 (defn random-id
   []
   (str "_" (.substr (.toString (.random js/Math) 36) 2 9)))
+
+(defn center-bounds
+  [{:keys [x y width height]}]
+  {:x      (+ x (/ width 2))
+   :y      (+ y (/ height 2))
+   :width  (/ width 2)
+   :height (/ height 2)})
