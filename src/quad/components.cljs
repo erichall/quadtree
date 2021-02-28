@@ -240,7 +240,6 @@
 
 (defn tooltip
   [{:keys [x y should-show?] :as s}]
-  (println x y "wooo" s)
   (when should-show?
     [:div {:style {:background "rgba(222, 199, 255, 0.45)"
                    :transform  (str "translate(" x "px," y "px)")

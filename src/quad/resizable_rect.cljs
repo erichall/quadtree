@@ -144,9 +144,8 @@
                                :start-height height)
                         (when (:on-resize-start callbacks)
                           ((:on-resize-start callbacks)
-                           (merge {:event data} (select-keys @state-atom [:x :y :height :width]))))
-                        )
-     :on-resize (let [{:keys [current-resize start-y start-x start-width start-height max-width min-width max-height min-height]} @state-atom
+                           (merge {:event data} (select-keys @state-atom [:x :y :height :width])))))
+     :on-resize (let [{:keys [current-resize start-y start-x start-width start-height]} @state-atom
                       mouse-x (mouse-x data)
                       mouse-y (mouse-y data)
                       dy (- mouse-y start-y)
@@ -175,10 +174,10 @@
                                         :x (+ start-x dx))
                     :bottom-right (swap! state-atom assoc
                                          :height (+ start-height dy)
-                                         :width (+ start-width dx))
-                    (when (:on-resize callbacks)
-                      ((:on-resize callbacks)
-                       (merge {:event data} (select-keys @state-atom [:x :y :height :width]))))))
+                                         :width (+ start-width dx)))
+                  (when (:on-resize callbacks)
+                    ((:on-resize callbacks)
+                     (merge {:event data} (select-keys @state-atom [:x :y :height :width])))))
      :on-resize-end (do
                       (swap! state-atom assoc :resizing? false)
                       (when (:on-resize-end callbacks)
@@ -221,10 +220,11 @@
 ;; Fix the little glitchy thingy when resizing from top, I think we need to clamp the cursor pos to the absolute edges.
 
 (defn mouse-handler
-  [{:keys [js-evt on-move]}]
+  [{:keys [js-evt on-move on-resize]}]
   (let [type (keyword (.-type js-evt))]
     (condp = type
-      :mousemove (handle-event! :on-mouse-move js-evt {:on-move on-move})
+      :mousemove (handle-event! :on-mouse-move js-evt {:on-move   on-move
+                                                       :on-resize on-resize})
       :mouseup (handle-event! :on-mouse-up js-evt)
       :mousedown (handle-event! :on-mouse-down js-evt)
       ;; else

@@ -9,6 +9,13 @@
 (defrecord Cell [x y data])
 (defrecord Quadtree [capacity bounds cells nw ne sw se depth])
 
+(defn center-bounds
+  [{:keys [x y width height]}]
+  {:x      (+ x (/ width 2))
+   :y      (+ y (/ height 2))
+   :width  (/ width 2)
+   :height (/ height 2)})
+
 (defn two-pow
   "computes 2 ^ n"
   {:test (fn []
@@ -515,12 +522,14 @@
   (time (sort-cells-by-z-order (random-cells 1000 100 100)
                                ))
 
-  (let [cells (-> (random-cells 100000 1000 1000)
+  (let [cells (-> (random-cells 1000000 8192 8192)
                   sort-cells-by-z-order
                   )
         tree (make-tree {:capacity 4
-                         :bounds   {:x 2048
-                                    :y 2048}})]
+                         :bounds   (center-bounds {:x      0
+                                                   :y      0
+                                                   :width  8192
+                                                   :height 8192})})]
 
     (c/with-progress-reporting
       (c/quick-bench

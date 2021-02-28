@@ -57,17 +57,17 @@
                                            :y            0
                                            :should-show? false}
                       }))
-
 (def initial-tree (qt/make-tree {:capacity 4
                                  :name     "start"
-                                 :bounds   {:x      (/ (:width @state-atom) 2)
-                                            :y      (/ (:height @state-atom) 2)
-                                            :width  (dec (/ (:width @state-atom) 2))
-                                            :height (dec (/ (:height @state-atom) 2))}}))
+                                 :bounds   (u/center-bounds {:x      1
+                                                             :y      1
+                                                             :width  (dec (:width @state-atom))
+                                                             :height (dec (:height @state-atom))})}))
 (defn render-divs
   "Render the resizable rect and the control panel.
   this is separate from the canvas rendering functions, giiish it's a mes right"
   [{:keys [tooltip width height controls cell-width cell-height cell-color cell-in-rect-color bounds-color performance]}]
+
   (rd/render
     [:<>
      [comp/resizable-rect {:movable-area-width  width
@@ -175,8 +175,10 @@
                     (-> (swap! state-atom (fn [{:keys [cells tree] :as state}]
                                             (-> (assoc state :tree (qt/insert-cells tree random-cells))
                                                 (assoc :cells (concat cells random-cells))
-                                                (assoc :is-drawing-points true))))
-                        (u/raf-render render)))
+                                                (assoc :is-drawing-points true)
+                                                (assoc-in [:tooltip :should-show?] false))))
+                        (u/raf-render render))
+                    (render-divs @state-atom))
       :new-tree (let [new-tree (:tree data)
                       cells (:cells data)]
                   (-> (swap! state-atom assoc
@@ -206,11 +208,15 @@
 (defn on-rect-move
   [bounds]
   (-> (swap! state-atom assoc :target-bounds (u/center-bounds bounds))
-      (u/raf-render render-cells)))
+      (u/raf-render render-cells))
+  (render-divs @state-atom))
 
 (defn on-rect-resize
   [bounds]
-  (swap! state-atom assoc :target-bounds (dissoc bounds :event)))
+  (-> (swap! state-atom assoc :target-bounds (dissoc bounds :event))
+      (u/raf-render render-cells))
+  (render-divs @state-atom)
+  )
 
 (defn on-control-move!
   [js-evt]
@@ -322,6 +328,7 @@
   [js-evt]
   (let [id (keyword (aget js-evt "target" "id"))
         type (keyword (.-type js-evt))]
+
     (cond
       (or (= id :performance-container)
           (get-in @state-atom [:performance :moving?]))
@@ -332,7 +339,10 @@
       (control-mouse-handler @state-atom js-evt id type)
 
       (and (= id :overlay)
-           (= type :mouseup))
+           (= type :mouseup)
+           (not (comp/is-resizing-rect?))
+           (not (comp/is-moving-rect?))
+           (not (:is-drawing-points @state-atom)))
       (let [x (u/client-x js-evt)
             y (u/client-y js-evt)]
         ;(println (cells-on-coordinate @state-atom x y))
@@ -340,10 +350,14 @@
                                 (-> state
                                     (assoc-in [:tooltip :x] x)
                                     (assoc-in [:tooltip :y] y)
-                                    (assoc-in [:tooltip :should-show?] true))))
-            render-divs
-            )
-        )
+                                    (assoc-in [:tooltip :should-show?] true)
+                                    (assoc :is-drawing-points false))))
+            render-divs))
+
+      (and (= id :overlay)
+           (= type :mouseup)
+           (:is-drawing-points @state-atom))
+      (swap! state-atom assoc :is-drawing-points false)
 
       (and (= id :overlay)
            (not (comp/is-resizing-rect?))
@@ -356,7 +370,9 @@
           (comp/event-is-move? js-evt)
           (comp/is-moving-rect?)
           (comp/is-resizing-rect?))
-      (comp/rect-mouse-handler {:js-evt js-evt :on-move on-rect-move})
+      (comp/rect-mouse-handler {:js-evt    js-evt
+                                :on-move   on-rect-move
+                                :on-resize on-rect-resize})
 
       :else nil)))
 
