@@ -191,9 +191,7 @@
                :for   "myonoffswitch"}
        [:span {:class "onoffswitch-inner"}]
        [:span {:class "onoffswitch-switch"}]
-       ]]]
-    ]
-   ])
+       ]]]]])
 
 (defn performance
   []
@@ -235,8 +233,7 @@
                    [:span {:style {:margin-right "15px"}}
                     n-cells " Cells"]
                    [:span
-                    (- random-cells-end start) " ms"]
-                   ]) (reverse random-cells)))]))))
+                    (- random-cells-end start) " ms"]]) (reverse random-cells)))]))))
 
 (defn tooltip
   [{:keys [x y should-show?] :as s}]
@@ -245,6 +242,4 @@
                    :transform  (str "translate(" x "px," y "px)")
                    :position   "absolute"
                    :width      "100px"
-                   :height     "50px"
-                   }}])
-  )
+                   :height     "50px"}}]))
