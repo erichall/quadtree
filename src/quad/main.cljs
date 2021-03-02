@@ -144,7 +144,6 @@
                                                                                  :end-on?  :render
                                                                                  :id       timer-id
                                                                                  :n-cells  data})
-
                         (console/time-start "insert-random-cells")
                         (->> cells
                              qt/sort-cells-by-z-order
