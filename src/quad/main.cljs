@@ -421,6 +421,5 @@
 
   (qt/insert-cells initial-tree (qt/make-cells 10))
 
-  (println (qt/in-tree? (:tree @state-atom) {:x 901, :y 95}))
-  )
+  (println (qt/in-tree? (:tree @state-atom) {:x 901, :y 95})))
 
